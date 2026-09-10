@@ -15,13 +15,13 @@ before use, and the reasoning behind each design choice is recorded in
 - Grafana with its Prometheus datasource provisioned from a ConfigMap
 - Both UIs reachable on the host through kind port mappings
 
-![Prometheus targets](docs/images/targets.png)
+![Prometheus targets](docs/images/targets.webp)
 
 All five scrape jobs healthy. The three Kubernetes jobs only report UP if the
 ServiceAccount token, the ClusterRole and `nodes/proxy` access all work, so
 this page doubles as proof the RBAC is correct.
 
-![Grafana datasource](docs/images/datasource.png)
+![Grafana datasource](docs/images/datasource.webp)
 
 ## Access control
 

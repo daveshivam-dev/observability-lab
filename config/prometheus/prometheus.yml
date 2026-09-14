@@ -95,3 +95,11 @@ scrape_configs:
         target_label: namespace
       - source_labels: [__meta_kubernetes_pod_name]
         target_label: pod
+
+  # 6. Mac scrape job 
+  - job_name: node-exporter-mac
+    static_configs:
+      - targets: ["host.docker.internal:9100"]
+        labels:
+          host: mac-mini-01
+          os: darwin

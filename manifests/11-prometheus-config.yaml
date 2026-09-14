@@ -112,3 +112,11 @@ data:
             labels:
               host: mac-mini-01
               os: darwin
+
+      #7. Windows scrape job
+      - job_name: windows-exporter
+        static_configs:
+          - targets: ["192.168.0.2:9182"]
+            labels:
+              host: workstation-01
+              os: windows

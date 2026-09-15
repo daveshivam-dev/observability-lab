@@ -143,6 +143,13 @@ includes a real embedded device. That mirrors how monitoring works in a
 segmented production network: a narrow, documented exception for a trusted
 observer rather than a hole in the boundary.
 
+Isolation is confirmable rather than inferred. ARP still resolves the MAC for
+an isolated device, because address resolution happens at layer 2 before the
+router filters forwarding, while ICMP gets no reply. An ARP entry proves the
+device is present on the segment; it does not prove it is reachable. That
+distinguishes an isolated device from an absent one, which matters when
+interpreting a failed probe.
+
 Coverage is therefore the main segment plus one IoT device, not the whole
 estate. Anyone reading a dashboard needs to know that, which is why it is
 written here rather than assumed.

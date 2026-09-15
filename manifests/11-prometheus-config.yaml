@@ -120,3 +120,53 @@ data:
             labels:
               host: workstation-01
               os: windows
+
+      # 8. Blackbox ICMP probes. The scrape target is the exporter; the probed
+      # address travels as a URL parameter and is relabelled back into a label.
+      - job_name: blackbox-icmp
+        metrics_path: /probe
+        params:
+          module: [icmp]
+        static_configs:
+          - targets:
+              - 192.168.0.1
+              - 192.168.0.63
+              - 1.1.1.1
+        relabel_configs:
+          - source_labels: [__address__]
+            target_label: __param_target
+          - source_labels: [__param_target]
+            target_label: instance
+          - target_label: __address__
+            replacement: blackbox-exporter.observability.svc.cluster.local:9115
+
+      - job_name: blackbox-http
+        metrics_path: /probe
+        params:
+          module: [http_2xx]
+        static_configs:
+          - targets:
+              - https://example.com
+              - http://prometheus.observability.svc.cluster.local:9090/-/healthy
+        relabel_configs:
+          - source_labels: [__address__]
+            target_label: __param_target
+          - source_labels: [__param_target]
+            target_label: instance
+          - target_label: __address__
+            replacement: blackbox-exporter.observability.svc.cluster.local:9115
+
+      - job_name: blackbox-tcp
+        metrics_path: /probe
+        params:
+          module: [tcp_connect]
+        static_configs:
+          - targets:
+              - 192.168.0.2:9182
+        relabel_configs:
+          - source_labels: [__address__]
+            target_label: __param_target
+          - source_labels: [__param_target]
+            target_label: instance
+          - target_label: __address__
+            replacement: blackbox-exporter.observability.svc.cluster.local:9115

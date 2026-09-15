@@ -16,6 +16,8 @@ before use, and the reasoning behind each design choice is recorded in
   machine, both scraped from inside the cluster
 - Read only cluster scoped RBAC for the Prometheus ServiceAccount
 - Grafana with its Prometheus datasource provisioned from a ConfigMap
+- `blackbox-exporter` probing the router, hosts, an IoT device and two
+  external control endpoints over ICMP, HTTP and TCP
 - Both UIs reachable on the host through kind port mappings
 
 ![Prometheus targets](docs/images/targets.webp)
@@ -44,6 +46,52 @@ example `node_memory_total_bytes` against
 `windows_memory_physical_total_bytes`, so a panel covering both hosts needs one
 query per operating system. Full reasoning in D-006 and D-007 of
 [docs/decisions.md](docs/decisions.md).
+
+## Black box probing
+
+Six targets probed from inside the cluster by `blackbox-exporter`: the router,
+two hosts, one embedded IoT device, and two external endpoints used as
+controls. Three modules are configured: `icmp`, `http_2xx` and `tcp_connect`.
+
+![Probe success during a deliberate outage](docs/images/probe-down.png)
+
+A host was taken offline for six minutes. Its probe drops to 0 and recovers,
+while the control targets hold at 1 throughout. That contrast is what makes the
+signal useful: it separates "this device failed" from "my network failed" or
+"the exporter failed".
+
+The narrow dip shortly before it is a different device flapping for about
+30 seconds. At a wider graph range the two are indistinguishable, which is why
+alert rules need a `for` clause rather than firing on a single failed scrape.
+
+### How the probe jobs work
+
+The scrape target is the exporter, not the device. The address to probe travels
+as a URL parameter and is relabelled back into the `instance` label:
+
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target        # becomes ?target=...
+      - source_labels: [__param_target]
+        target_label: instance              # label the series by the device
+      - target_label: __address__
+        replacement: blackbox-exporter.observability.svc.cluster.local:9115
+
+The resulting request is
+`GET blackbox:9115/probe?module=icmp&target=192.168.0.1`. One exporter serves
+every target, and the target list describes what to probe rather than what to
+scrape.
+
+### Coverage
+
+Eight of the nine IoT devices have client isolation enabled on the router, so
+they cannot be probed from the monitoring host. One is deliberately excluded
+from isolation so the probe set includes a real embedded device. The router
+offers no SNMP agent, so there is no privileged vantage point onto the isolated
+segment either.
+
+Coverage is the main network plus one IoT device, not the whole estate. The
+reasoning is in D-009 to D-011 of [docs/decisions.md](docs/decisions.md).
 
 ## Access control
 
@@ -107,4 +155,7 @@ Teardown:
 | Windows target down, no obvious cause | Firewall rule scoped to Private while the network is categorised Public | `Get-NetConnectionProfile` on the Windows machine |
 | Query returns an empty result but the target is UP | Metric renamed between exporter versions | `curl -s <exporter>/metrics \| grep <keyword>` |
 | Datasource test fails, Prometheus healthy | Wrong Service DNS name | Must be `prometheus.observability.svc.cluster.local:9090` |
+| Probe target down, device reachable from the host | Client isolation on the router, or a pod-to-LAN routing difference | Test from a pod, not the host |
+| All ICMP probes fail, exporter healthy | Missing `NET_RAW` capability | `kubectl -n observability logs deploy/blackbox-exporter` |
+| Probe job fails with an invalid port | Typo in the relabel `replacement` | Per-target `lastError` in the targets API |
 | `ImagePullBackOff`, exec format error | amd64 only image | Check `docker buildx imagetools inspect <image>` for `linux/arm64` |

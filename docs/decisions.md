@@ -117,3 +117,96 @@ Fixed by setting the network category to Private. The Public profile is
 designed for untrusted networks such as cafes and airports, where blocking
 inbound connections and local discovery is the right default. On a home
 network it blocks exactly the traffic this project depends on.
+## D-009: Network segmentation limits what can be probed
+
+The network runs three SSIDs on one subnet: a hidden main network, an IoT
+network, and a guest network. Client isolation is enabled per device on the
+router, and eight of the nine IoT devices have it applied.
+
+Isolation stops client to client traffic, which is exactly what an ICMP or TCP
+probe is. Those eight devices are therefore unreachable from the cluster and
+cannot be probed, even though they sit in the same address range.
+
+Options considered:
+
+- Remove isolation from the devices to be monitored. Rejected: monitoring is a
+  poor reason to weaken a security control.
+- Run a second blackbox exporter inside the isolated segment and scrape it
+  remotely. Correct at scale, rejected here as it needs additional hardware for
+  a two hour session.
+- Monitor from the router, which sees every segment. Rejected because the
+  hardware does not support it, see D-011.
+
+Decision: probe what the monitoring host can reach, and state the gap rather
+than hide it. One IoT device is deliberately left unisolated so the probe set
+includes a real embedded device. That mirrors how monitoring works in a
+segmented production network: a narrow, documented exception for a trusted
+observer rather than a hole in the boundary.
+
+Coverage is therefore the main segment plus one IoT device, not the whole
+estate. Anyone reading a dashboard needs to know that, which is why it is
+written here rather than assumed.
+
+## D-010: NET_RAW granted to the blackbox exporter
+
+Every other container in this repo drops all capabilities. The blackbox
+exporter is the exception: it is granted `NET_RAW`.
+
+ICMP requires raw sockets, and a process without `CAP_NET_RAW` cannot open
+one. Without the capability the icmp module fails every probe with a
+permissions error while the exporter itself stays healthy, which is a
+misleading failure mode.
+
+The alternative was to drop ICMP entirely and probe with `tcp_connect` against
+a known open port. Rejected because several targets, including the embedded IoT
+device, expose no open ports at all. ICMP is the only signal available for
+them.
+
+Everything else is retained: non-root user 65534, `allowPrivilegeEscalation:
+false`, read only root filesystem, `seccompProfile: RuntimeDefault`, and all
+other capabilities dropped. The exception is one capability, granted for a
+stated reason, rather than a relaxed security context.
+
+## D-011: SNMP dropped, the router does not support it
+
+The original plan included `snmp-exporter` against the router, which would have
+given a cross-segment view without traversing the isolation boundary.
+
+The router is a TP-Link Archer AX53. It exposes no SNMP agent: there is no SNMP
+section in the web administration interface, and `snmpwalk` against it times out
+with both v1 and v2c using the default community string. TP-Link reserves SNMP
+for its business and Omada product lines.
+
+This is a hardware constraint rather than a configuration one, and it is worth
+recording because it is a real limit of consumer equipment. A privileged
+vantage point onto every network segment is not available at this price point.
+
+Consequences:
+
+- `snmp-exporter` is not deployed, and `config/snmp/` does not exist
+- The isolated IoT devices have no monitoring route at all, see D-009
+- Per interface traffic counters and the DHCP lease table are unavailable, so
+  any later work needing that data has to source it from the router web
+  interface instead
+
+## D-012: Scrape interval sets the detection floor
+
+The scrape interval is 15s and the ICMP probe timeout is 5s. An outage shorter
+than roughly 30 seconds may produce one failed sample or none at all.
+
+This was observed rather than assumed. During testing, one device flapped for
+about 30 seconds and a deliberate outage lasted six minutes. At a 15 minute
+graph range both appeared as near identical vertical lines, and only the
+narrower range distinguished them.
+
+Two consequences carried into the alerting work:
+
+- Alert rules need a `for` clause long enough to survive a normal blip.
+  Detection and alerting are separate thresholds.
+- A device that is intermittently unreachable by design is a dashboard
+  candidate, not a paging candidate. The test is whether a human would take
+  action, and for a device that sleeps there is no action to take.
+
+Shortening the scrape interval would lower the detection floor at the cost of
+more samples, more storage and more load on the probed devices. Not worth it
+here, where nothing depends on sub minute detection.

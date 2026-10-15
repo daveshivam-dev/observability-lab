@@ -4,6 +4,9 @@ global:
   external_labels:
     cluster: kind-observability
 
+rule_files:
+  - /etc/prometheus/rules/*.yaml
+
 scrape_configs:
   # 1. Prometheus scraping itself. This is the acceptance target.
   - job_name: prometheus

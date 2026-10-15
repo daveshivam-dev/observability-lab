@@ -1,0 +1,36 @@
+groups:
+  - name: exporter-health
+    interval: 30s
+    rules:
+      - alert: TargetDown
+        expr: up == 0
+        for: 5m
+        labels:
+          severity: warning
+          scope: monitoring
+        annotations:
+          summary: "Prometheus cannot scrape {{ $labels.job }} at {{ $labels.instance }}"
+          description: "The target has been unreachable for 5 minutes. Monitoring is blind for this job."
+          runbook_url: "https://github.com/daveshivam-dev/observability-lab/blob/main/docs/runbooks/exporter-down.md"
+
+      - alert: PrometheusRestarting
+        expr: changes(process_start_time_seconds{job="prometheus"}[30m]) > 2
+        for: 5m
+        labels:
+          severity: critical
+          scope: monitoring
+        annotations:
+          summary: "Prometheus has restarted repeatedly"
+          description: "More than two restarts in 30 minutes. With emptyDir storage every restart loses history."
+          runbook_url: "https://github.com/daveshivam-dev/observability-lab/blob/main/docs/runbooks/exporter-down.md"
+
+      - alert: BlackboxExporterDown
+        expr: up{job=~"blackbox.*"} == 0 or absent(probe_success)
+        for: 5m
+        labels:
+          severity: critical
+          scope: monitoring
+        annotations:
+          summary: "Black box probing has stopped"
+          description: "No probe results are being produced, so every device appears healthy by omission."
+          runbook_url: "https://github.com/daveshivam-dev/observability-lab/blob/main/docs/runbooks/exporter-down.md"

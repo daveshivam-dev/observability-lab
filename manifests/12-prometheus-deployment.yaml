@@ -71,6 +71,9 @@ spec:
               mountPath: /prometheus
             - name: tmp
               mountPath: /tmp
+            - name: rules
+              mountPath: /etc/prometheus/rules
+              readOnly: true
       volumes:
         - name: config
           configMap:
@@ -81,3 +84,6 @@ spec:
           emptyDir: {}
         - name: tmp
           emptyDir: {}
+        - name: rules
+          configMap:
+            name: prometheus-rules

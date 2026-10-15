@@ -1,0 +1,46 @@
+groups:
+  - name: device-availability
+    interval: 30s
+    rules:
+      - alert: RouterUnreachable
+        expr: probe_success{instance="192.168.0.1"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          scope: network
+        annotations:
+          summary: "Router is not responding to ICMP"
+          description: "The default gateway has failed {{ $value }} probes. Everything downstream is likely affected."
+          runbook_url: "https://github.com/daveshivam-dev/observability-lab/blob/main/docs/runbooks/device-unreachable.md"
+
+      - alert: HostUnreachable
+        expr: probe_success{job="blackbox-tcp"} == 0
+        for: 5m
+        labels:
+          severity: warning
+          scope: host
+        annotations:
+          summary: "Host {{ $labels.instance }} unreachable for 5 minutes"
+          description: "TCP probe to {{ $labels.instance }} has failed continuously."
+          runbook_url: "https://github.com/daveshivam-dev/observability-lab/blob/main/docs/runbooks/device-unreachable.md"
+
+      - alert: InternetConnectivityLost
+        expr: probe_success{instance="1.1.1.1"} == 0 and probe_success{instance="192.168.0.1"} == 1
+        for: 2m
+        labels:
+          severity: critical
+          scope: network
+        annotations:
+          summary: "External connectivity lost while the router is up"
+          description: "The gateway responds but an external address does not, which points at the WAN link rather than the local network."
+          runbook_url: "https://github.com/daveshivam-dev/observability-lab/blob/main/docs/runbooks/device-unreachable.md"
+
+      - alert: ProbeLatencyHigh
+        expr: probe_duration_seconds{job="blackbox-icmp"} > 1
+        for: 10m
+        labels:
+          severity: info
+          scope: network
+        annotations:
+          summary: "Probe to {{ $labels.instance }} is slow"
+          description: "Round trip is {{ $value | humanizeDuration }}, which usually means Wi-Fi power saving or congestion."

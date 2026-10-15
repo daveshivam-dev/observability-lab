@@ -1,0 +1,133 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-rules
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: prometheus
+data:
+  device-availability.yaml: |
+    groups:
+      - name: device-availability
+        interval: 30s
+        rules:
+          - alert: RouterUnreachable
+            expr: probe_success{instance="192.168.0.1"} == 0
+            for: 2m
+            labels:
+              severity: critical
+              scope: network
+            annotations:
+              summary: "Router is not responding to ICMP"
+              description: "The default gateway has failed {{ $value }} probes. Everything downstream is likely affected."
+              runbook_url: "https://github.com/daveshivam-dev/observability-lab/blob/main/docs/runbooks/device-unreachable.md"
+
+          - alert: HostUnreachable
+            expr: probe_success{job="blackbox-tcp"} == 0
+            for: 5m
+            labels:
+              severity: warning
+              scope: host
+            annotations:
+              summary: "Host {{ $labels.instance }} unreachable for 5 minutes"
+              description: "TCP probe to {{ $labels.instance }} has failed continuously."
+              runbook_url: "https://github.com/daveshivam-dev/observability-lab/blob/main/docs/runbooks/device-unreachable.md"
+
+          - alert: InternetConnectivityLost
+            expr: probe_success{instance="1.1.1.1"} == 0 and probe_success{instance="192.168.0.1"} == 1
+            for: 2m
+            labels:
+              severity: critical
+              scope: network
+            annotations:
+              summary: "External connectivity lost while the router is up"
+              description: "The gateway responds but an external address does not, which points at the WAN link rather than the local network."
+              runbook_url: "https://github.com/daveshivam-dev/observability-lab/blob/main/docs/runbooks/device-unreachable.md"
+
+          - alert: ProbeLatencyHigh
+            expr: probe_duration_seconds{job="blackbox-icmp"} > 1
+            for: 10m
+            labels:
+              severity: info
+              scope: network
+            annotations:
+              summary: "Probe to {{ $labels.instance }} is slow"
+              description: "Round trip is {{ $value | humanizeDuration }}, which usually means Wi-Fi power saving or congestion."
+  exporter-health.yaml: |
+    groups:
+      - name: exporter-health
+        interval: 30s
+        rules:
+          - alert: TargetDown
+            expr: up == 0
+            for: 5m
+            labels:
+              severity: warning
+              scope: monitoring
+            annotations:
+              summary: "Prometheus cannot scrape {{ $labels.job }} at {{ $labels.instance }}"
+              description: "The target has been unreachable for 5 minutes. Monitoring is blind for this job."
+              runbook_url: "https://github.com/daveshivam-dev/observability-lab/blob/main/docs/runbooks/exporter-down.md"
+
+          - alert: PrometheusRestarting
+            expr: changes(process_start_time_seconds{job="prometheus"}[30m]) > 2
+            for: 5m
+            labels:
+              severity: critical
+              scope: monitoring
+            annotations:
+              summary: "Prometheus has restarted repeatedly"
+              description: "More than two restarts in 30 minutes. With emptyDir storage every restart loses history."
+              runbook_url: "https://github.com/daveshivam-dev/observability-lab/blob/main/docs/runbooks/exporter-down.md"
+
+          - alert: BlackboxExporterDown
+            expr: up{job=~"blackbox.*"} == 0 or absent(probe_success)
+            for: 5m
+            labels:
+              severity: critical
+              scope: monitoring
+            annotations:
+              summary: "Black box probing has stopped"
+              description: "No probe results are being produced, so every device appears healthy by omission."
+              runbook_url: "https://github.com/daveshivam-dev/observability-lab/blob/main/docs/runbooks/exporter-down.md"
+  host-resources.yaml: |
+    groups:
+      - name: host-resources
+        interval: 30s
+        rules:
+          - alert: HostDiskFilling
+            expr: |
+              100 * (1 - node_filesystem_avail_bytes{mountpoint="/"}
+                       / node_filesystem_size_bytes{mountpoint="/"}) > 85
+            for: 10m
+            labels:
+              severity: warning
+              scope: host
+            annotations:
+              summary: "Disk above 85 percent on {{ $labels.host }}"
+              description: "Root filesystem is {{ $value | printf \"%.1f\" }} percent full."
+              runbook_url: "https://github.com/daveshivam-dev/observability-lab/blob/main/docs/runbooks/host-disk.md"
+
+          - alert: HostDiskWillFill
+            expr: predict_linear(node_filesystem_avail_bytes{mountpoint="/"}[6h], 4*3600) < 0
+            for: 30m
+            labels:
+              severity: warning
+              scope: host
+            annotations:
+              summary: "Disk on {{ $labels.host }} predicted to fill within 4 hours"
+              description: "Based on the last 6 hours of growth. Acting now is cheaper than acting at zero."
+              runbook_url: "https://github.com/daveshivam-dev/observability-lab/blob/main/docs/runbooks/host-disk.md"
+
+          - alert: WindowsDiskFilling
+            expr: |
+              100 * (1 - windows_logical_disk_free_bytes{volume="C:"}
+                       / windows_logical_disk_size_bytes{volume="C:"}) > 85
+            for: 10m
+            labels:
+              severity: warning
+              scope: host
+            annotations:
+              summary: "Disk above 85 percent on {{ $labels.host }}"
+              description: "Volume C: is {{ $value | printf \"%.1f\" }} percent full."
+              runbook_url: "https://github.com/daveshivam-dev/observability-lab/blob/main/docs/runbooks/host-disk.md"

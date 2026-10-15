@@ -1,0 +1,40 @@
+groups:
+  - name: host-resources
+    interval: 30s
+    rules:
+      - alert: HostDiskFilling
+        expr: |
+          100 * (1 - node_filesystem_avail_bytes{mountpoint="/"}
+                   / node_filesystem_size_bytes{mountpoint="/"}) > 85
+        for: 10m
+        labels:
+          severity: warning
+          scope: host
+        annotations:
+          summary: "Disk above 85 percent on {{ $labels.host }}"
+          description: "Root filesystem is {{ $value | printf \"%.1f\" }} percent full."
+          runbook_url: "https://github.com/daveshivam-dev/observability-lab/blob/main/docs/runbooks/host-disk.md"
+
+      - alert: HostDiskWillFill
+        expr: predict_linear(node_filesystem_avail_bytes{mountpoint="/"}[6h], 4*3600) < 0
+        for: 30m
+        labels:
+          severity: warning
+          scope: host
+        annotations:
+          summary: "Disk on {{ $labels.host }} predicted to fill within 4 hours"
+          description: "Based on the last 6 hours of growth. Acting now is cheaper than acting at zero."
+          runbook_url: "https://github.com/daveshivam-dev/observability-lab/blob/main/docs/runbooks/host-disk.md"
+
+      - alert: WindowsDiskFilling
+        expr: |
+          100 * (1 - windows_logical_disk_free_bytes{volume="C:"}
+                   / windows_logical_disk_size_bytes{volume="C:"}) > 85
+        for: 10m
+        labels:
+          severity: warning
+          scope: host
+        annotations:
+          summary: "Disk above 85 percent on {{ $labels.host }}"
+          description: "Volume C: is {{ $value | printf \"%.1f\" }} percent full."
+          runbook_url: "https://github.com/daveshivam-dev/observability-lab/blob/main/docs/runbooks/host-disk.md"

@@ -8,3 +8,5 @@ cd "$(dirname "$0")/.."
 
 ./scripts/render-configmap.sh config/blackbox/blackbox.yml \
   blackbox-config blackbox.yml manifests/40-blackbox-configmap.yaml
+
+./scripts/render-rules.sh

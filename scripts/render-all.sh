@@ -10,3 +10,6 @@ cd "$(dirname "$0")/.."
   blackbox-config blackbox.yml manifests/40-blackbox-configmap.yaml
 
 ./scripts/render-rules.sh
+
+./scripts/render-configmap.sh config/alertmanager/alertmanager.yml \
+  alertmanager-config alertmanager.yml manifests/33-alertmanager-configmap.yaml

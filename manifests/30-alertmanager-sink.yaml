@@ -1,0 +1,56 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: alertmanager-sink
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: alertmanager-sink
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: alertmanager-sink
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: alertmanager-sink
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+        runAsGroup: 65534
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: sink
+          # Echoes every request it receives to stdout. Stands in for a real
+          # notification channel so the payload is inspectable with kubectl logs.
+          image: mendhak/http-https-echo:35
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: HTTP_PORT
+              value: "8080"
+          ports:
+            - name: http
+              containerPort: 8080
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            requests: {cpu: 20m, memory: 32Mi}
+            limits: {memory: 128Mi}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: alertmanager-sink
+  namespace: observability
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: alertmanager-sink
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http

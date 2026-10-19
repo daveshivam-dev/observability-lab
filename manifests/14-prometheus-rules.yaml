@@ -95,30 +95,6 @@ data:
       - name: host-resources
         interval: 30s
         rules:
-          - alert: HostDiskFilling
-            expr: |
-              100 * (1 - node_filesystem_avail_bytes{mountpoint="/"}
-                       / node_filesystem_size_bytes{mountpoint="/"}) > 85
-            for: 10m
-            labels:
-              severity: warning
-              scope: host
-            annotations:
-              summary: "Disk above 85 percent on {{ $labels.host }}"
-              description: "Root filesystem is {{ $value | printf \"%.1f\" }} percent full."
-              runbook_url: "https://github.com/daveshivam-dev/observability-lab/blob/main/docs/runbooks/host-disk.md"
-
-          - alert: HostDiskWillFill
-            expr: predict_linear(node_filesystem_avail_bytes{mountpoint="/"}[6h], 4*3600) < 0
-            for: 30m
-            labels:
-              severity: warning
-              scope: host
-            annotations:
-              summary: "Disk on {{ $labels.host }} predicted to fill within 4 hours"
-              description: "Based on the last 6 hours of growth. Acting now is cheaper than acting at zero."
-              runbook_url: "https://github.com/daveshivam-dev/observability-lab/blob/main/docs/runbooks/host-disk.md"
-
           - alert: WindowsDiskFilling
             expr: |
               100 * (1 - windows_logical_disk_free_bytes{volume="C:"}
@@ -131,3 +107,256 @@ data:
               summary: "Disk above 85 percent on {{ $labels.host }}"
               description: "Volume C: is {{ $value | printf \"%.1f\" }} percent full."
               runbook_url: "https://github.com/daveshivam-dev/observability-lab/blob/main/docs/runbooks/host-disk.md"
+  mac-host.yaml: |
+    groups:
+      - name: mac-host-availability
+        interval: 30s
+        rules:
+          - alert: MacHostDown
+            expr: up{job="node-exporter-mac"} == 0
+            for: 5m
+            labels: {severity: critical, scope: host, host: mac-mini-01}
+            annotations:
+              summary: "node_exporter on the Mac is unreachable"
+              description: "Prometheus has not scraped the Mac for 5 minutes. Monitoring is blind for this host."
+              runbook_url: "https://github.com/daveshivam-dev/observability-lab/blob/main/docs/runbooks/exporter-down.md"
+
+          - alert: MacHostRebooted
+            expr: time() - node_boot_time_seconds < 600
+            for: 1m
+            labels: {severity: warning, scope: host, host: mac-mini-01}
+            annotations:
+              summary: "The Mac rebooted within the last 10 minutes"
+              description: "Uptime is {{ $value | humanizeDuration }}. If no reboot was planned, check for a crash."
+              runbook_url: "https://github.com/daveshivam-dev/observability-lab/blob/main/docs/runbooks/host-reboot.md"
+
+          - alert: MacCollectorFailing
+            expr: node_scrape_collector_success{collector!="thermal"} == 0
+            for: 15m
+            labels: {severity: warning, scope: monitoring, host: mac-mini-01}
+            annotations:
+              summary: "node_exporter collector {{ $labels.collector }} is failing"
+              description: "The exporter reports up while this collector returns nothing, so part of the dashboard is silently empty."
+              runbook_url: "https://github.com/daveshivam-dev/observability-lab/blob/main/docs/runbooks/exporter-down.md"
+
+          - alert: MacTextfileCollectorError
+            expr: node_textfile_scrape_error > 0
+            for: 10m
+            labels: {severity: warning, scope: monitoring, host: mac-mini-01}
+            annotations:
+              summary: "A textfile collector .prom file cannot be read"
+              description: "Every metric in that file is dropped with no other symptom. Also fires when the external SSD is unmounted."
+              runbook_url: "https://github.com/daveshivam-dev/observability-lab/blob/main/docs/runbooks/exporter-down.md"
+
+      - name: mac-host-disk
+        interval: 30s
+        rules:
+          - alert: MacDiskFilling
+            expr: |
+              100 * (1 - node_filesystem_avail_bytes{job="node-exporter-mac", mountpoint="/System/Volumes/Data"}
+                       / node_filesystem_size_bytes{job="node-exporter-mac", mountpoint="/System/Volumes/Data"}) > 85
+            for: 10m
+            labels: {severity: warning, scope: host, host: mac-mini-01}
+            annotations:
+              summary: "Internal disk above 85 percent"
+              description: "The data volume is {{ $value | printf \"%.1f\" }} percent full."
+              runbook_url: "https://github.com/daveshivam-dev/observability-lab/blob/main/docs/runbooks/host-disk.md"
+
+          - alert: MacDiskCritical
+            expr: |
+              100 * (1 - node_filesystem_avail_bytes{job="node-exporter-mac", mountpoint="/System/Volumes/Data"}
+                       / node_filesystem_size_bytes{job="node-exporter-mac", mountpoint="/System/Volumes/Data"}) > 93
+            for: 5m
+            labels: {severity: critical, scope: host, host: mac-mini-01}
+            annotations:
+              summary: "Internal disk above 93 percent"
+              description: "At {{ $value | printf \"%.1f\" }} percent, macOS starts failing writes and behaving unpredictably."
+              runbook_url: "https://github.com/daveshivam-dev/observability-lab/blob/main/docs/runbooks/host-disk.md"
+
+          - alert: MacDiskWillFill
+            expr: |
+              predict_linear(node_filesystem_avail_bytes{job="node-exporter-mac", mountpoint="/System/Volumes/Data"}[6h], 24*3600) < 0
+            for: 30m
+            labels: {severity: warning, scope: host, host: mac-mini-01}
+            annotations:
+              summary: "Internal disk predicted to fill within 24 hours"
+              description: "Based on the last 6 hours of growth. Acting now is cheaper than acting at zero."
+              runbook_url: "https://github.com/daveshivam-dev/observability-lab/blob/main/docs/runbooks/host-disk.md"
+
+          - alert: MacExternalDiskMissing
+            expr: absent(node_filesystem_size_bytes{job="node-exporter-mac", mountpoint="/Volumes/DD"})
+            for: 10m
+            labels: {severity: warning, scope: host, host: mac-mini-01}
+            annotations:
+              summary: "The external SSD is no longer mounted"
+              description: "The project repository, tooling and the Docker disk image all live on it. absent() is used because the series disappears rather than going to zero."
+              runbook_url: "https://github.com/daveshivam-dev/observability-lab/blob/main/docs/runbooks/host-disk.md"
+
+          - alert: MacVolumeReadOnly
+            expr: node_filesystem_readonly{job="node-exporter-mac", mountpoint=~"/System/Volumes/Data|/Volumes/.+"} == 1
+            for: 5m
+            labels: {severity: critical, scope: host, host: mac-mini-01}
+            annotations:
+              summary: "Volume {{ $labels.mountpoint }} has gone read only"
+              description: "APFS remounts read only when it detects corruption. Writes are failing now."
+              runbook_url: "https://github.com/daveshivam-dev/observability-lab/blob/main/docs/runbooks/host-disk.md"
+
+          - alert: MacFilesystemDeviceError
+            expr: node_filesystem_device_error{job="node-exporter-mac", mountpoint=~"/System/Volumes/Data|/Volumes/.+"} == 1
+            for: 5m
+            labels: {severity: critical, scope: host, host: mac-mini-01}
+            annotations:
+              summary: "Filesystem device error on {{ $labels.mountpoint }}"
+              description: "The exporter could not stat the filesystem. Usually a disconnected or failing device."
+              runbook_url: "https://github.com/daveshivam-dev/observability-lab/blob/main/docs/runbooks/host-disk.md"
+
+          - alert: MacDiskHardwareErrors
+            expr: increase(node_disk_read_errors_total{job="node-exporter-mac"}[1h]) > 0
+                  or increase(node_disk_write_errors_total{job="node-exporter-mac"}[1h]) > 0
+            for: 5m
+            labels: {severity: critical, scope: host, host: mac-mini-01}
+            annotations:
+              summary: "Disk hardware errors on {{ $labels.device }}"
+              description: "{{ $value }} errors in the last hour. Back up before investigating."
+              runbook_url: "https://github.com/daveshivam-dev/observability-lab/blob/main/docs/runbooks/host-disk.md"
+
+          - alert: MacDiskRetriesRising
+            expr: increase(node_disk_read_retries_total{job="node-exporter-mac"}[1h]) > 100
+                  or increase(node_disk_write_retries_total{job="node-exporter-mac"}[1h]) > 100
+            for: 15m
+            labels: {severity: warning, scope: host, host: mac-mini-01}
+            annotations:
+              summary: "Disk retries rising on {{ $labels.device }}"
+              description: "Retries climb before errors appear, so this is the earliest warning of a failing drive."
+              runbook_url: "https://github.com/daveshivam-dev/observability-lab/blob/main/docs/runbooks/host-disk.md"
+
+          - alert: MacDiskLatencyHigh
+            expr: |
+              rate(node_disk_read_time_seconds_total{job="node-exporter-mac"}[5m])
+              / clamp_min(rate(node_disk_reads_completed_total{job="node-exporter-mac"}[5m]), 1) > 0.05
+            for: 15m
+            labels: {severity: warning, scope: host, host: mac-mini-01}
+            annotations:
+              summary: "Disk read latency above 50ms on {{ $labels.device }}"
+              description: "Sustained high latency on an SSD points at a failing device or a saturated bus."
+              runbook_url: "https://github.com/daveshivam-dev/observability-lab/blob/main/docs/runbooks/host-disk.md"
+
+          - alert: MacInodesLow
+            expr: node_filesystem_files_free{job="node-exporter-mac", mountpoint=~"/System/Volumes/Data|/Volumes/.+"}
+              / clamp_min(node_filesystem_files{job="node-exporter-mac", mountpoint=~"/System/Volumes/Data|/Volumes/.+"}, 1) < 0.10
+            for: 15m
+            labels: {severity: warning, scope: host, host: mac-mini-01}
+            annotations:
+              summary: "Inodes below 10 percent on {{ $labels.mountpoint }}"
+              description: "This is how 'disk full with space free' presents. Usually millions of small files."
+              runbook_url: "https://github.com/daveshivam-dev/observability-lab/blob/main/docs/runbooks/host-disk.md"
+
+          - alert: MacExternalDiskFilling
+            expr: |
+              100 * (1 - node_filesystem_avail_bytes{job="node-exporter-mac", mountpoint="/Volumes/DD"}
+                       / node_filesystem_size_bytes{job="node-exporter-mac", mountpoint="/Volumes/DD"}) > 85
+            for: 10m
+            labels: {severity: warning, scope: host, host: mac-mini-01}
+            annotations:
+              summary: "External SSD above 85 percent"
+              description: "The 931 GB external drive is {{ $value | printf \"%.1f\" }} percent full. It holds the Docker disk image, which grows without bound."
+              runbook_url: "https://github.com/daveshivam-dev/observability-lab/blob/main/docs/runbooks/host-disk.md"
+
+      - name: mac-host-memory
+        interval: 30s
+        rules:
+          - alert: MacMemoryPressure
+            expr: node_memory_compressed_bytes{job="node-exporter-mac"} > 4e9
+            for: 15m
+            labels: {severity: warning, scope: host, host: mac-mini-01}
+            annotations:
+              summary: "Sustained memory pressure on the Mac"
+              description: "{{ $value | humanize1024 }}B of memory is compressed. macOS compresses before it swaps, so this is the earliest honest signal. A free-memory threshold would be misleading here."
+              runbook_url: "https://github.com/daveshivam-dev/observability-lab/blob/main/docs/runbooks/host-memory.md"
+
+          - alert: MacSwapping
+            expr: rate(node_memory_swapped_out_bytes_total{job="node-exporter-mac"}[15m]) > 1e6
+            for: 15m
+            labels: {severity: warning, scope: host, host: mac-mini-01}
+            annotations:
+              summary: "The Mac is swapping to disk"
+              description: "Sustained swap-out at {{ $value | humanize1024 }}B/s. Compression has been exhausted."
+              runbook_url: "https://github.com/daveshivam-dev/observability-lab/blob/main/docs/runbooks/host-memory.md"
+
+          - alert: MacSwapFileGrowing
+            expr: node_memory_swap_total_bytes{job="node-exporter-mac"} > 4e9
+            for: 30m
+            labels: {severity: warning, scope: host, host: mac-mini-01}
+            annotations:
+              summary: "The macOS swap file has grown past 4 GiB"
+              description: "macOS grows the swap file on demand, so its size is itself a pressure signal. It also consumes disk space on the volume that is already filling."
+              runbook_url: "https://github.com/daveshivam-dev/observability-lab/blob/main/docs/runbooks/host-memory.md"
+
+          - alert: MacWiredMemoryHigh
+            expr: node_memory_wired_bytes{job="node-exporter-mac"} > 0.5 * node_memory_total_bytes{job="node-exporter-mac"}
+            for: 30m
+            labels: {severity: warning, scope: host, host: mac-mini-01}
+            annotations:
+              summary: "Wired memory above half of physical RAM"
+              description: "Wired memory cannot be paged out, so it sets a hard floor. A steady climb usually means a kernel extension or driver leak."
+              runbook_url: "https://github.com/daveshivam-dev/observability-lab/blob/main/docs/runbooks/host-memory.md"
+
+      - name: mac-host-cpu-network
+        interval: 30s
+        rules:
+          - alert: MacCPUSaturated
+            expr: 100 - (avg(rate(node_cpu_seconds_total{job="node-exporter-mac", mode="idle"}[5m])) * 100) > 90
+            for: 30m
+            labels: {severity: warning, scope: host, host: mac-mini-01}
+            annotations:
+              summary: "CPU above 90 percent for 30 minutes"
+              description: "A long for clause deliberately ignores builds and other short bursts."
+              runbook_url: "https://github.com/daveshivam-dev/observability-lab/blob/main/docs/runbooks/host-cpu.md"
+
+          - alert: MacLoadHigh
+            expr: node_load5{job="node-exporter-mac"} > 2 * count(count by (cpu) (node_cpu_seconds_total{job="node-exporter-mac"}))
+            for: 15m
+            labels: {severity: warning, scope: host, host: mac-mini-01}
+            annotations:
+              summary: "Load average more than twice the core count"
+              description: "Load is {{ $value | printf \"%.1f\" }}. The threshold is derived from the core count rather than hardcoded, so it survives a hardware change."
+              runbook_url: "https://github.com/daveshivam-dev/observability-lab/blob/main/docs/runbooks/host-cpu.md"
+
+          - alert: MacNetworkErrors
+            expr: rate(node_network_receive_errs_total{job="node-exporter-mac", device!~"lo0|utun.*|awdl.*|llw.*"}[15m]) > 1
+            for: 15m
+            labels: {severity: warning, scope: host, host: mac-mini-01}
+            annotations:
+              summary: "Network errors on {{ $labels.device }}"
+              description: "Sustained errors point at interference, a cable or a driver."
+              runbook_url: "https://github.com/daveshivam-dev/observability-lab/blob/main/docs/runbooks/host-network.md"
+
+          - alert: MacClockSkew
+            expr: abs(node_time_seconds{job="node-exporter-mac"} - time()) > 5
+            for: 10m
+            labels: {severity: warning, scope: host, host: mac-mini-01}
+            annotations:
+              summary: "Clock skew above 5 seconds"
+              description: "Drift breaks TLS validation, token expiry and log correlation, and the symptoms rarely point at the clock."
+              runbook_url: "https://github.com/daveshivam-dev/observability-lab/blob/main/docs/runbooks/host-clock.md"
+
+      - name: mac-host-updates
+        interval: 60s
+        rules:
+          - alert: MacUpdatesPending
+            expr: node_custom_pending_updates > 0
+            for: 24h
+            labels: {severity: info, scope: host, host: mac-mini-01}
+            annotations:
+              summary: "{{ $value }} macOS updates pending"
+              description: "Deliberately low urgency with a 24h for clause, so it only fires if updates are genuinely being ignored."
+              runbook_url: "https://github.com/daveshivam-dev/observability-lab/blob/main/docs/runbooks/host-updates.md"
+
+          - alert: MacUpdateCheckStale
+            expr: (time() - node_custom_update_check_timestamp) > 604800
+            for: 1h
+            labels: {severity: warning, scope: host, host: mac-mini-01}
+            annotations:
+              summary: "The update check has not run for a week"
+              description: "Catches the silent failure where the script died and zero pending looks identical to healthy."
+              runbook_url: "https://github.com/daveshivam-dev/observability-lab/blob/main/docs/runbooks/host-updates.md"

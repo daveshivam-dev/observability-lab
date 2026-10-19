@@ -1,8 +1,9 @@
 # Local observability lab
 
-A two node Kubernetes cluster running Prometheus and Grafana, deployed from
-manifests. No Helm charts, no kube-prometheus-stack: every resource here was
-written directly so the moving parts stay visible.
+A two node Kubernetes cluster running Prometheus, Alertmanager and Grafana,
+monitoring a real home network across macOS, Windows and isolated IoT devices.
+Every resource here was written directly from the API reference. No Helm
+charts, no kube-prometheus-stack, so the moving parts stay visible.
 
 Runs on Apple Silicon. Every image is verified for a `linux/arm64` variant
 before use, and the reasoning behind each design choice is recorded in
@@ -10,152 +11,258 @@ before use, and the reasoning behind each design choice is recorded in
 
 ## What it does
 
-- kind cluster, one control plane and one worker
+**Cluster and core stack**
+- kind cluster, one control plane and one worker, reachable on the host
+  through port mappings
 - Prometheus scraping itself, the API server, both kubelets and cAdvisor
-- `node_exporter` on the macOS host and `windows_exporter` on a Windows
-  machine, both scraped from inside the cluster
 - Read only cluster scoped RBAC for the Prometheus ServiceAccount
 - Grafana with its Prometheus datasource provisioned from a ConfigMap
-- `blackbox-exporter` probing the router, hosts, an IoT device and two
+
+**Hosts**
+- `node_exporter` on the macOS host and `windows_exporter` on a Windows
+  machine, both scraped from inside the cluster
+- Two different answers to the same networking problem, documented in
+  D-006: a Docker DNS alias for the host running the cluster, a LAN address
+  for the separate machine
+
+**Network**
+- `blackbox-exporter` probing the router, both hosts, an IoT device and two
   external control endpoints over ICMP, HTTP and TCP
-- Both UIs reachable on the host through kind port mappings
+- The standard `relabel_configs` pattern, where the scrape target is the
+  exporter and the probed address travels as `__param_target` before being
+  relabelled into `instance`
 
-![Prometheus targets](docs/images/targets.webp)
+**Alerting**
+- Alert rules across five files in `config/prometheus/rules/`, covering
+  device availability, host resources, exporter health, macOS specifics and
+  the custom exporter
+- Alertmanager with grouping, severity routing and three inhibition rules,
+  so a failed gateway produces one notification rather than eight
+- A webhook receiver that logs the payload, so delivery is verifiable with
+  `kubectl logs` rather than assumed
 
-The Kubernetes jobs only report UP if the ServiceAccount token, the ClusterRole
-and `nodes/proxy` access all work, so this page doubles as proof the RBAC is
-correct.
+**Dashboards and runbooks**
+- Five Grafana dashboards in `dashboards/`, generated as JSON and imported,
+  not assembled by hand in the UI
+- Nine runbooks in `docs/runbooks/`, one per alert family, each linked from
+  the `runbook_url` annotation on the rules that use it
 
-![Grafana datasource](docs/images/datasource.webp)
+**A custom exporter**
+- `exporters/homelab-exporter/` exposes two things nothing off the shelf
+  covers: device presence through the ARP table, and directory sizes
+- ARP presence works where ICMP probing cannot. Eight IoT devices have
+  client isolation enabled, so they never answer a ping, but layer 2
+  resolution still happens before the router drops the forwarded packet
+- Directory sizes exist because of an incident. An application cache reached
+  127 GB with no metric moving until the volume alert fired at 85 percent
 
-## Host metrics across two operating systems
+## Architecture
 
-Prometheus scrapes `node_exporter` on the macOS host and `windows_exporter` on
-a Windows machine on the same LAN. Neither exporter runs in the cluster.
+```
+  macOS host                              Windows machine
+  ├─ node_exporter :9100                  └─ windows_exporter :9182
+  ├─ homelab-exporter :9220                          │
+  └─ Docker ────────────────────────────┐            │
+       │                                │            │
+       │  kind cluster                  │            │
+       │  ┌──────────────────────────┐  │            │
+       │  │ namespace: observability │  │            │
+       │  │                          │  │            │
+       │  │  Prometheus ─────────────┼──┴────────────┘
+       │  │    │  │                  │   scrapes hosts and LAN
+       │  │    │  └─ blackbox-exporter ──> router, hosts, IoT, external
+       │  │    │                     │
+       │  │    └─> Alertmanager ─────┼──> webhook sink (logs payload)
+       │  │                          │
+       │  │  Grafana <─ datasource ──┘
+       │  └──────────────────────────┘
+       │
+  NodePort 30090 -> 9090 (Prometheus), 30000 -> 3000 (Grafana)
+```
 
-![Memory across both hosts](docs/images/explore-cross-os-memory.png)
+Both exporters on the hosts run outside Kubernetes deliberately. They report
+on the machine, and a pod sees a container's view of the world rather than
+the host's. The custom exporter has a second reason: a container has its own
+network namespace and therefore its own ARP table, so it would start cleanly
+and report confidently on the wrong network (D-013).
 
-Reaching each host needed a different answer. A pod's `localhost` is the pod
-itself, so the Mac is scraped through `host.docker.internal`, the DNS alias
-Docker Desktop provides for its host. The Windows machine is a separate device
-on the LAN and is reached by its address. Both routes were tested from inside
-the cluster before being committed.
+## Repo layout
 
-The two exporters also use different metric names for the same concept, for
-example `node_memory_total_bytes` against
-`windows_memory_physical_total_bytes`, so a panel covering both hosts needs one
-query per operating system. Full reasoning in D-006 and D-007 of
-[docs/decisions.md](docs/decisions.md).
+```
+cluster/kind-config.yaml        two nodes, host port mappings
+config/
+  prometheus/prometheus.yml     source of truth, linted by promtool
+  prometheus/rules/             alert rules, five files
+  blackbox/blackbox.yml         icmp, http_2xx, tcp_connect modules
+  alertmanager/alertmanager.yml routing, grouping, inhibition
+  local/                        real addresses, gitignored
+manifests/                      flat and numbered, applies alphabetically
+scripts/render-all.sh           regenerates every ConfigMap from config/
+dashboards/                     five Grafana dashboards as JSON
+exporters/homelab-exporter/     custom Python exporter, tests, Dockerfile
+docs/
+  decisions.md                  18 decisions with reasoning and dates
+  sanitisation.md               what must never be committed
+  runbooks/                     one per alert family
+  images/
+```
 
-## Black box probing
+### The ConfigMap rendering rule
 
-Six targets probed from inside the cluster by `blackbox-exporter`: the router,
-two hosts, one embedded IoT device, and two external endpoints used as
-controls. Three modules are configured: `icmp`, `http_2xx` and `tcp_connect`.
+`config/prometheus/prometheus.yml` is the source of truth. It is a real
+Prometheus config file, so `promtool check config` can lint it, which it
+cannot do for YAML embedded in a ConfigMap's `data` block.
+`manifests/11-prometheus-config.yaml` is generated from it.
 
-![Probe success during a deliberate outage](docs/images/probe-down.png)
+```
+./scripts/render-all.sh
+kubectl apply -f manifests/
+kubectl -n observability rollout restart deploy/prometheus
+```
 
-A host was taken offline for six minutes. Its probe drops to 0 and recovers,
-while the control targets hold at 1 throughout. That contrast is what makes the
-signal useful: it separates "this device failed" from "my network failed" or
-"the exporter failed".
-
-The narrow dip shortly before it is a different device flapping for about
-30 seconds. At a wider graph range the two are indistinguishable, which is why
-alert rules need a `for` clause rather than firing on a single failed scrape.
-
-### How the probe jobs work
-
-The scrape target is the exporter, not the device. The address to probe travels
-as a URL parameter and is relabelled back into the `instance` label:
-
-    relabel_configs:
-      - source_labels: [__address__]
-        target_label: __param_target        # becomes ?target=...
-      - source_labels: [__param_target]
-        target_label: instance              # label the series by the device
-      - target_label: __address__
-        replacement: blackbox-exporter.observability.svc.cluster.local:9115
-
-The resulting request is
-`GET blackbox:9115/probe?module=icmp&target=192.168.0.1`. One exporter serves
-every target, and the target list describes what to probe rather than what to
-scrape.
-
-### Coverage
-
-Eight of the nine IoT devices have client isolation enabled on the router, so
-they cannot be probed from the monitoring host. One is deliberately excluded
-from isolation so the probe set includes a real embedded device. The router
-offers no SNMP agent, so there is no privileged vantage point onto the isolated
-segment either.
-
-Coverage is the main network plus one IoT device, not the whole estate. The
-reasoning is in D-009 to D-011 of [docs/decisions.md](docs/decisions.md).
-
-## Access control
-
-Prometheus needs cluster scope for service discovery but no write access
-anywhere. The ClusterRole grants `get`, `list` and `watch` on nodes, pods,
-services and endpoints, plus `get` on `nodes/proxy` for kubelet and cAdvisor
-scraping. Nothing else.
-
-    kubectl auth can-i list nodes   --as=system:serviceaccount:observability:prometheus   # yes
-    kubectl auth can-i delete pods  --as=system:serviceaccount:observability:prometheus   # no
-
-## Configuration layout
-
-`config/prometheus/prometheus.yml` is the source of truth for the scrape
-config. It is a real Prometheus config file, so `promtool` can lint it.
-`manifests/11-prometheus-config.yaml` is generated from it:
-
-    ./scripts/render-configmap.sh
-
-Edit the config file, re-render, apply, then restart Prometheus. Applying a
-ConfigMap does not restart the pods that mount it, and Prometheus does not
-re-read its config on its own.
+Edit the config, re-render, apply, restart. Never edit a rendered ConfigMap
+directly, because the next render overwrites it. Applying a ConfigMap does
+not restart the pods that mount it, which is a step worth knowing before it
+costs a debugging round.
 
 ## Running it
 
-Requires kubectl, kind, kubeconform and a container runtime. Standalone
-binaries work fine; a package manager is not needed.
+```
+kind create cluster --config cluster/kind-config.yaml
+kubectl apply -f manifests/
+kubectl -n observability get pods -w
+```
 
-    kubeconform -strict -summary -ignore-missing-schemas manifests/
-    kind create cluster --config cluster/kind-config.yaml
-    kubectl apply -f manifests/
-    kubectl -n observability rollout status deploy/prometheus deploy/grafana
+Prometheus at http://localhost:9090, Grafana at http://localhost:3000.
+Import the dashboards from `dashboards/` and point them at the provisioned
+Prometheus datasource.
 
-Prometheus on http://localhost:9090, Grafana on http://localhost:3000.
+Teardown, in this order, because the kind nodes are containers backed by a
+Docker disk image on an external drive:
 
-Teardown:
+```
+kind delete cluster --name observability
+```
 
-    kind delete cluster --name observability
+## Alerting
+
+Thresholds were chosen by observing the systems rather than copied:
+
+| Alert | Threshold | Why |
+|---|---|---|
+| RouterUnreachable | for 2m | Everything depends on it, detect fast |
+| HostUnreachable | for 5m | A host rebooting should not page anyone |
+| MacDiskFilling | 85 percent for 10m | Matches the dashboard threshold so both agree |
+| MacMemoryPressure | compressed > 4 GiB | macOS compresses before it swaps, so this is the earliest honest signal |
+| IsolatedDeviceAbsent | for 30m | Embedded devices drop off the ARP table when idle |
+
+Every filesystem rule is scoped with
+`mountpoint=~"/System/Volumes/Data|/Volumes/.+"`. Five APFS volumes share one
+container and report identical figures, so an unscoped rule fires five times
+for one condition. That is easy to ship without noticing, because five alerts
+for a real problem still looks like the alert working.
+
+Inhibition, in order of usefulness:
+
+```
+RouterUnreachable     suppresses  scope=host
+severity=critical     suppresses  severity=warning  (same alertname, instance)
+BlackboxExporterDown  suppresses  scope=network
+```
+
+## The custom exporter
+
+```
+homelab_device_present{device,type}
+homelab_device_last_seen_timestamp_seconds{device,type}
+homelab_arp_devices_total{subnet}
+homelab_arp_unmapped_devices
+homelab_directory_size_bytes{name}
+homelab_directory_present{name}
+homelab_collector_last_run_timestamp_seconds
+homelab_collector_duration_seconds{collector}
+homelab_collector_errors_total{collector}
+```
+
+Four design choices worth defending:
+
+**Cardinality is bounded by construction.** Devices are labelled by a name
+from a config file, never by MAC. A MAC label would be unbounded, since every
+visitor's phone and every randomised address becomes a permanent series, and
+it would put hardware identifiers into the metric store. Unmapped devices
+increment a counter and create no series. A unit test asserts that no label
+value anywhere in the registry looks like a MAC address.
+
+**Absence is represented explicitly.** Every known device emits a zero at
+startup. Without it, a device absent since boot has no series at all and an
+alert on `== 0` can never fire. Same reasoning for directories: a missing one
+reports absent rather than size zero, because "the drive is unmounted" and
+"the cache was cleaned" need opposite responses.
+
+**An empty ARP table is an error, not a finding.** Since macOS 15, reading
+the neighbour table needs Local Network permission granted per binary. One
+Python interpreter returned exit code 0, no stderr and zero bytes where
+another returned fifteen entries. An exporter trusting that result would
+report every device absent with the error counter at zero: a confident,
+precise, entirely wrong answer. A live segment always has a gateway, so the
+exporter now raises instead.
+
+**It runs on the host.** See D-013 above.
+
+Fourteen tests, none touching the network, run with `pytest`.
+
+## Screenshots
+
+| | |
+|---|---|
+| ![targets](docs/images/targets.webp) | Prometheus targets, all healthy |
+| ![datasource](docs/images/datasource.webp) | Grafana datasource provisioned from a ConfigMap |
+| ![cross-os](docs/images/explore-cross-os-memory.png) | macOS and Windows memory on one graph |
+| ![probe down](docs/images/probe-down.png) | `probe_success` flipping to 0 |
+| ![alerts firing](docs/images/alerts-firing.png) | Three alert groups, one firing in each |
+| ![alert detail](docs/images/alerts-pending-and-firing.png) | A firing alert with annotations rendered, including the resolved runbook link |
+| ![alertmanager](docs/images/alertmanager-discovery.png) | Prometheus has discovered Alertmanager |
+| ![flapping](docs/images/probe-failures-24h.png) | `changes(probe_success[24h])`, one device at 210 transitions |
+
+## Sanitisation
+
+Rules are in [docs/sanitisation.md](docs/sanitisation.md), written before the
+first real address was typed into a config rather than as a cleanup pass,
+because git history keeps whatever was committed.
+
+No public addresses, no MAC addresses, no SSID, no router model with
+firmware version, no hostnames identifying the household. Devices carry
+generic labels. Real values live in a gitignored `config/local/`. Dashboard
+JSON embeds queries, which embed labels, so exports are checked before they
+are committed.
+
+This is enforced rather than trusted. A pre-push grep caught five real MAC
+addresses staged for commit in test fixtures and documentation examples,
+copied from live output while writing the files. They were replaced with the
+range RFC 7042 reserves for documentation. The person writing the rules is as
+likely to breach them as anyone else, which is why the check becomes a
+blocking CI job.
 
 ## Known limitations
 
-- Grafana's admin password is set through a plain environment variable. It
-  belongs in a Secret, generated at bootstrap rather than committed.
-- Storage is `emptyDir` with 6h retention. The cluster is disposable by
-  design, so metrics do not survive a rebuild.
-- Access is via NodePort and kind port mappings rather than an ingress
-  controller, which keeps the manifest count down at the cost of realism.
-- Host targets are static entries. The Windows address comes from DHCP, so a
-  new lease would break the scrape silently.
+- Storage is `emptyDir`, so a restart loses metric history and resets every
+  pending alert clock
+- Exporters serve plaintext with no authentication to anything on the LAN
+- The Windows host is a static DHCP address with no reservation, so a lease
+  change breaks the scrape
+- The router has no SNMP support, so SNMP was dropped (D-011)
+- Coverage is limited to what one vantage point can reach. Devices on the
+  guest network are not visible at all
+- The custom exporter does not autostart. launchd is denied access to the
+  external volume it lives on
 
-## Known failure modes
+## What I would change for production
 
-| Symptom | Root cause | Diagnostic |
-|---|---|---|
-| `localhost:9090` refuses connection | Service nodePort does not match `containerPort` in the kind config | 30090 for Prometheus, 30000 for Grafana |
-| Port mapping change has no effect | `extraPortMappings` are fixed at cluster creation | Recreate the cluster |
-| Prometheus in CrashLoopBackOff | Malformed scrape config | `kubectl -n observability logs deploy/prometheus` |
-| Config change has no effect | ConfigMap applied but pod not restarted | `kubectl -n observability rollout restart deploy/prometheus` |
-| Targets return 403 | RBAC | `kubectl auth can-i list nodes --as=system:serviceaccount:observability:prometheus` |
-| Host target down, exporter reachable from the host itself | Pod cannot route to the host | Test from inside the cluster with a throwaway busybox pod |
-| Windows target down, no obvious cause | Firewall rule scoped to Private while the network is categorised Public | `Get-NetConnectionProfile` on the Windows machine |
-| Query returns an empty result but the target is UP | Metric renamed between exporter versions | `curl -s <exporter>/metrics \| grep <keyword>` |
-| Datasource test fails, Prometheus healthy | Wrong Service DNS name | Must be `prometheus.observability.svc.cluster.local:9090` |
-| Probe target down, device reachable from the host | Client isolation on the router, or a pod-to-LAN routing difference | Test from a pod, not the host |
-| All ICMP probes fail, exporter healthy | Missing `NET_RAW` capability | `kubectl -n observability logs deploy/blackbox-exporter` |
-| Probe job fails with an invalid port | Typo in the relabel `replacement` | Per-target `lastError` in the targets API |
-| `ImagePullBackOff`, exec format error | amd64 only image | Check `docker buildx imagetools inspect <image>` for `linux/arm64` |
+Persistent storage and a retention policy. Service discovery instead of
+static host entries. Recording rules to normalise metric names across
+platforms, because the same concept currently needs one query per OS and
+every panel and alert doubles with each new platform. TLS and authentication
+on the exporters. Secrets rather than plain ConfigMaps for anything
+credentialed. High availability for Prometheus, which is a single point of
+failure here. And a collector inside the isolated segment, so coverage is not
+bounded by where the one collector happens to sit.

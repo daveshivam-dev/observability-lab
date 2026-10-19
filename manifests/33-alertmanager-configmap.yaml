@@ -1,0 +1,69 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: alertmanager-config
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: alertmanager
+data:
+  alertmanager.yml: |
+    global:
+      resolve_timeout: 5m
+
+    route:
+      # Group alerts that share these labels into one notification.
+      group_by: ['alertname', 'scope']
+      # Wait this long before sending the first notification for a new group,
+      # so related alerts arriving together are batched rather than sent one by one.
+      group_wait: 30s
+      # Wait this long before sending an update about an existing group.
+      group_interval: 5m
+      # Re-send a still-firing alert at most this often.
+      repeat_interval: 4h
+      receiver: default
+
+      routes:
+        - matchers:
+            - severity = critical
+          receiver: critical
+          group_wait: 10s
+          repeat_interval: 1h
+
+        - matchers:
+            - severity = info
+          receiver: default
+          repeat_interval: 24h
+
+    inhibit_rules:
+      # If the router is down, every downstream device is unreachable as a
+      # consequence. Suppress the symptoms and alert on the cause.
+      - source_matchers:
+          - alertname = RouterUnreachable
+        target_matchers:
+          - scope = host
+        equal: []
+
+      # A critical alert suppresses a warning about the same thing.
+      - source_matchers:
+          - severity = critical
+        target_matchers:
+          - severity = warning
+        equal: ['alertname', 'instance']
+
+      # If black box probing has stopped entirely, device alerts are meaningless.
+      - source_matchers:
+          - alertname = BlackboxExporterDown
+        target_matchers:
+          - scope = network
+        equal: []
+
+    receivers:
+      - name: default
+        webhook_configs:
+          - url: http://alertmanager-sink.observability.svc.cluster.local:8080/
+            send_resolved: true
+
+      - name: critical
+        webhook_configs:
+          - url: http://alertmanager-sink.observability.svc.cluster.local:8080/critical
+            send_resolved: true

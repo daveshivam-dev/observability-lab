@@ -21,6 +21,8 @@ Fill in the result column after running the commands above. If an image has no
 image, `--platform linux/amd64` under emulation, or build from source) and the
 cost of that workaround.
 
+| homelab-exporter | 0.1.0 (python:3.12-slim base) | yes | 2026-10-19 |
+
 ### Images without an arm64 variant
 
 None so far.

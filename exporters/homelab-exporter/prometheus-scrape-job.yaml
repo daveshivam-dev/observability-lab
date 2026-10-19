@@ -1,0 +1,12 @@
+# Append to config/prometheus/prometheus.yml under scrape_configs.
+#
+# Scraped through host.docker.internal for the same reason node_exporter is:
+# the exporter runs on the Mac, not in the cluster. See D-013.
+
+  - job_name: homelab-exporter
+    scrape_interval: 30s
+    static_configs:
+      - targets: ["host.docker.internal:9220"]
+        labels:
+          host: mac-mini-01
+          os: darwin

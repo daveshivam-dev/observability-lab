@@ -217,3 +217,139 @@ Two consequences carried into the alerting work:
 Shortening the scrape interval would lower the detection floor at the cost of
 more samples, more storage and more load on the probed devices. Not worth it
 here, where nothing depends on sub minute detection.
+
+## D-013: The custom exporter runs on the host, not in the cluster
+
+Every other component in this repo is deployed to Kubernetes. The homelab
+exporter is not, and the reason is not convenience.
+
+A container has its own network namespace, and therefore its own ARP table.
+A pod's ARP table contains other pods and the cluster gateway. It contains
+nothing about the LAN. An ARP-based presence exporter running in a pod would
+start cleanly, report confidently, and be measuring the wrong network
+entirely, which is worse than not running at all.
+
+The same reasoning already applies to node_exporter and windows_exporter:
+both report on a host, so both run on that host. This exporter joins them.
+
+A Dockerfile is still written and can be built in CI. The image is correct for
+a Linux host on the monitored segment run with `--network=host`, which is how
+this would be deployed if the segment had one. Building it also keeps the
+supply-chain scanning in the pipeline honest.
+
+Deviation from the original plan: the spec called for
+`manifests/50-iot-exporter-*.yaml`. No such manifest exists. What replaced it
+is a scrape job pointing at `host.docker.internal:9220` and a launchd agent.
+
+## D-014: Cardinality is bounded by the device map, not by what is on the network
+
+The obvious implementation labels each series with the device's MAC address.
+That is wrong twice over.
+
+It creates an unbounded label. Every phone, every guest device, every
+randomised MAC from a passing laptop becomes a permanent new time series.
+Unbounded cardinality is the most common way people take down a Prometheus
+server, and a home network with visitors generates new MACs continuously.
+
+It also puts hardware identifiers into the metric store, into every dashboard
+built on it, and into any exported dashboard JSON. `docs/sanitisation.md`
+forbids committing MAC addresses, and a metric label is a worse place for one
+than a config file.
+
+The exporter therefore labels only devices present in a map it is given.
+Anything else increments `homelab_arp_unmapped_devices` and creates no series.
+The cardinality ceiling is the length of the map: a number chosen by a human
+rather than discovered at runtime. One unit test asserts that no label value
+anywhere in the registry looks like a MAC address.
+
+That counter turned out to be useful in its own right. A rise means something
+new joined the network, which nothing else in the stack reports.
+
+The map lives in `config/local/devices.yaml`, which is gitignored.
+`devices.example.yaml` is committed with placeholder addresses.
+
+## D-015: Absence is represented explicitly
+
+Two metrics exist only to make absence visible.
+
+`homelab_device_present` emits a zero for every known device at startup,
+before any collection runs. Without that, a device absent since the exporter
+started would have no series at all, and `homelab_device_present == 0` could
+never match. The alert would be permanently silent and permanently green.
+
+`homelab_directory_present` exists so a missing directory does not report size
+zero. The watched directories include paths on the external SSD. "The drive is
+unmounted" and "the cache was cleaned up" produce the same number if size is
+the only metric, and they call for opposite responses.
+
+This is the same reasoning behind `absent()` in the exporter-down rules. In
+Prometheus a thing that stops existing is invisible unless you arrange
+otherwise, and silence reads as health.
+
+## D-016: macOS Local Network privacy, and why an empty result is an error
+
+Building this exporter surfaced a platform constraint worth recording.
+
+On macOS 15 and later, reading the kernel neighbour table requires Local
+Network permission, and that permission is granted **per binary**. Running
+`arp -an` in Terminal returned 15 entries. The identical call made by
+Homebrew's `python3` returned **exit code 0, no stderr, and zero bytes**.
+
+That is the worst failure mode available. The command succeeded. There was no
+error to catch, no non-zero exit, nothing in stderr. An exporter trusting that
+result would report every device absent, the error counter would stay at zero,
+and the dashboard would show a network with no devices on it: a confident,
+precise, entirely wrong answer.
+
+Two changes came out of it:
+
+**The venv is built from `/usr/bin/python3`**, the system interpreter, which
+has the permission. The launchd plist points at that venv. A service started
+with the wrong interpreter would exhibit the same silent failure.
+
+**An empty ARP table now raises rather than returning an empty list.** A live
+network segment always contains at least a gateway, so zero entries is a
+malfunction, not a finding. The exception is caught by the collector, which
+increments `homelab_collector_errors_total`, so the failure becomes visible
+instead of silent.
+
+The general lesson is worth more than the specific fix: when a check can fail
+in a way that looks like a healthy answer, the check has to distinguish the
+two itself. Nothing downstream can.
+
+## D-017: ARP is a cache of conversations, not an inventory
+
+The first version of this exporter read the ARP table passively and would have
+reported devices absent simply because nothing had spoken to them recently.
+ARP entries expire after roughly twenty minutes of silence.
+
+The exporter now sends one ICMP packet to each known address before reading
+the table, from `prime_addresses` in the config. Isolated devices never reply,
+and that does not matter: ARP resolution happens at layer 2, before the router
+drops the forwarded packet, so the entry appears regardless.
+
+That distinction is the whole premise of the exporter and it is directly
+observable:
+
+    $ arp -a | grep 192.168.0.48
+    ? (192.168.0.48) at 00:00:5e:00:53:05 on en1 ifscope [ethernet]
+    $ ping -c 2 192.168.0.48
+    2 packets transmitted, 0 packets received, 100.0% packet loss
+
+An ARP entry proves the device is on the segment. It does not prove it is
+reachable. Monitoring built on the first fact works where monitoring built on
+the second cannot.
+
+## D-018: Multicast addresses are not devices
+
+`homelab_arp_devices_total` initially counted `224.0.0.0/4` multicast groups
+alongside real hosts, inflating the figure by a constant few on any network
+running Bonjour or SSDP. `homelab_arp_unmapped_devices` had the same problem,
+which would have left it permanently above zero and therefore useless as a
+signal that something new had joined.
+
+Both now exclude non-unicast addresses. The bug is worth recording because of
+how it was found: a unit test asserting the unmapped count disagreed after the
+filter was added. A metric that is wrong by a small constant looks entirely
+plausible and can survive indefinitely without something mechanical checking
+it.

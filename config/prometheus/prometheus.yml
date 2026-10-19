@@ -169,4 +169,12 @@ scrape_configs:
       - source_labels: [__param_target]
         target_label: instance
       - target_label: __address__
-        replacement: blackbox-exporter.observability.svc.cluster.local:9115
+        replacement: blackbox-exporter.observability.svc.cluster.local:9115 
+
+  - job_name: homelab-exporter
+    scrape_interval: 30s
+    static_configs:
+      - targets: ["host.docker.internal:9220"]
+        labels:
+          host: mac-mini-01
+          os: darwin

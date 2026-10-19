@@ -90,6 +90,125 @@ data:
               summary: "Black box probing has stopped"
               description: "No probe results are being produced, so every device appears healthy by omission."
               runbook_url: "https://github.com/daveshivam-dev/observability-lab/blob/main/docs/runbooks/exporter-down.md"
+  homelab-exporter-rules.yaml: |
+    groups:
+      - name: homelab-devices
+        interval: 30s
+        rules:
+          - alert: IsolatedDeviceAbsent
+            expr: homelab_device_present{type="iot"} == 0
+            for: 30m
+            labels: {severity: warning, scope: network}
+            annotations:
+              summary: "IoT device {{ $labels.device }} has left the network"
+              description: >-
+                The device has not appeared in the ARP table for 30 minutes. These
+                devices cannot be probed because client isolation drops ICMP, so
+                ARP presence is the only signal available. A long for clause is
+                deliberate: embedded devices drop off the table briefly when idle.
+              runbook_url: "https://github.com/daveshivam-dev/observability-lab/blob/main/docs/runbooks/device-unreachable.md"
+
+          - alert: UnknownDeviceOnNetwork
+            expr: homelab_arp_unmapped_devices > 0
+            for: 15m
+            labels: {severity: info, scope: network}
+            annotations:
+              summary: "{{ $value }} unrecognised device(s) on the network"
+              description: >-
+                A device is present in the ARP table but absent from the device
+                map. Usually a phone or a guest. Worth a look if unexpected, since
+                this is the only signal that something new joined.
+              runbook_url: "https://github.com/daveshivam-dev/observability-lab/blob/main/docs/runbooks/device-unreachable.md"
+
+          - alert: AllIoTDevicesAbsent
+            expr: sum(homelab_device_present{type="iot"}) == 0
+            for: 15m
+            labels: {severity: warning, scope: network}
+            annotations:
+              summary: "Every tracked IoT device has left the ARP table at once"
+              description: >-
+                Simultaneous absence points at the router or the network segment
+                rather than the devices. The individual alerts would fire too, so
+                this one exists to name the likely cause rather than the symptoms.
+              runbook_url: "https://github.com/daveshivam-dev/observability-lab/blob/main/docs/runbooks/device-unreachable.md"
+
+      - name: homelab-directories
+        interval: 60s
+        rules:
+          - alert: DirectoryGrowingLarge
+            expr: homelab_directory_size_bytes{name="group-containers"} > 30e9
+            for: 1h
+            labels: {severity: warning, scope: host, host: mac-mini-01}
+            annotations:
+              summary: "Application containers above 30 GB"
+              description: >-
+                Currently {{ $value | humanize1024 }}B. This threshold exists
+                because an application cache reached 127 GB in October 2026 with
+                no metric moving until the volume alert fired. See the incident
+                write-up in the disk runbook.
+              runbook_url: "https://github.com/daveshivam-dev/observability-lab/blob/main/docs/runbooks/host-disk.md"
+
+          - alert: DirectoryGrowthRateHigh
+            expr: predict_linear(homelab_directory_size_bytes[6h], 7*86400) > 100e9
+            for: 2h
+            labels: {severity: info, scope: host, host: mac-mini-01}
+            annotations:
+              summary: "{{ $labels.name }} is on track to exceed 100 GB within a week"
+              description: >-
+                Rate of growth rather than absolute size, so it catches a runaway
+                directory before it becomes a disk alert.
+              runbook_url: "https://github.com/daveshivam-dev/observability-lab/blob/main/docs/runbooks/host-disk.md"
+
+          - alert: WatchedDirectoryMissing
+            expr: homelab_directory_present{name="docker-disk-image"} == 0
+            for: 15m
+            labels: {severity: warning, scope: host, host: mac-mini-01}
+            annotations:
+              summary: "The Docker disk image directory is not present"
+              description: >-
+                It lives on the external SSD. Absent means the drive is unmounted,
+                which also breaks the repo, the tooling and the cluster. The
+                metric reports absent rather than size 0 precisely so this is
+                distinguishable from a successful cleanup.
+              runbook_url: "https://github.com/daveshivam-dev/observability-lab/blob/main/docs/runbooks/host-disk.md"
+
+      - name: homelab-exporter-health
+        interval: 30s
+        rules:
+          - alert: HomelabExporterDown
+            expr: up{job="homelab-exporter"} == 0 or absent(up{job="homelab-exporter"})
+            for: 10m
+            labels: {severity: warning, scope: monitoring, host: mac-mini-01}
+            annotations:
+              summary: "The homelab exporter is not being scraped"
+              description: >-
+                absent() is included because a removed scrape job makes the series
+                disappear rather than go to zero, and up == 0 would never fire.
+              runbook_url: "https://github.com/daveshivam-dev/observability-lab/blob/main/docs/runbooks/exporter-down.md"
+
+          - alert: HomelabCollectorStale
+            expr: (time() - homelab_collector_last_run_timestamp_seconds) > 300
+            for: 10m
+            labels: {severity: warning, scope: monitoring, host: mac-mini-01}
+            annotations:
+              summary: "The collection loop has stopped"
+              description: >-
+                The exporter is serving metrics but no longer refreshing them, so
+                every value is frozen at its last reading. Without this alert that
+                failure looks identical to a stable network.
+              runbook_url: "https://github.com/daveshivam-dev/observability-lab/blob/main/docs/runbooks/exporter-down.md"
+
+          - alert: HomelabCollectorErrors
+            expr: increase(homelab_collector_errors_total[1h]) > 5
+            for: 15m
+            labels: {severity: warning, scope: monitoring, host: mac-mini-01}
+            annotations:
+              summary: "Collector {{ $labels.collector }} is failing repeatedly"
+              description: >-
+                The exporter degrades rather than crashing when a collector fails,
+                so this counter is the only indication that part of it has stopped
+                working.
+              runbook_url: "https://github.com/daveshivam-dev/observability-lab/blob/main/docs/runbooks/exporter-down.md"
   host-resources.yaml: |
     groups:
       - name: host-resources

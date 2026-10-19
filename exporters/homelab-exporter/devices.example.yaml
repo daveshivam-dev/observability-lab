@@ -1,0 +1,36 @@
+# Device map for the homelab exporter.
+#
+# Copy to config/local/devices.yaml and fill in the real MAC addresses.
+# config/local/ is gitignored, because MAC addresses are hardware identifiers
+# and docs/sanitisation.md forbids committing them.
+#
+# Devices absent from this map are counted by homelab_arp_unmapped_devices
+# but never labelled, which keeps cardinality bounded and keeps identifiers
+# out of the metric store.
+
+devices:
+  "00:00:00:00:00:01":
+    name: router-01
+    type: network
+  "00:00:00:00:00:02":
+    name: mac-mini-01
+    type: workstation
+  "00:00:00:00:00:03":
+    name: workstation-01
+    type: workstation
+  "00:00:00:00:00:04":
+    name: iot-01
+    type: iot
+  "00:00:00:00:00:05":
+    name: iot-02
+    type: iot
+  "00:00:00:00:00:06":
+    name: iot-03
+    type: iot
+
+directories:
+  applications: /Applications
+  caches: ~/Library/Caches
+  downloads: ~/Downloads
+  group-containers: ~/Library/Group Containers
+  docker-disk-image: /Volumes/DD/docker

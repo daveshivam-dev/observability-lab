@@ -1,2 +1,7 @@
 .DS_Store
 config/local/
+exporters/*/.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/

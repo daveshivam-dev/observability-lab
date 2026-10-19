@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.homelab.exporter</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/Volumes/DD/portfolio/obs-lab/exporters/homelab-exporter/.venv/bin/python3</string>
+    <string>/Volumes/DD/portfolio/obs-lab/exporters/homelab-exporter/main.py</string>
+    <string>--config</string>
+    <string>/Volumes/DD/portfolio/obs-lab/config/local/devices.yaml</string>
+    <string>--port</string>
+    <string>9220</string>
+    <string>--listen</string>
+    <string>127.0.0.1</string>
+  </array>
+
+  <!-- Bound to loopback above: the cluster reaches it through
+       host.docker.internal, and nothing else should. -->
+
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <dict>
+    <key>SuccessfulExit</key>
+    <false/>
+  </dict>
+
+  <key>StandardOutPath</key>
+  <string>/Volumes/DD/portfolio/logs/homelab-exporter.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Volumes/DD/portfolio/logs/homelab-exporter.log</string>
+
+  <key>ThrottleInterval</key>
+  <integer>30</integer>
+</dict>
+</plist>

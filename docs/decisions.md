@@ -355,3 +355,33 @@ how it was found: a unit test asserting the unmapped count disagreed after the
 filter was added. A metric that is wrong by a small constant looks entirely
 plausible and can survive indefinitely without something mechanical checking
 it.
+
+## D-019: Checks run in CI from pinned container images
+
+Every check in this repo was a manual step before pushing: the sanitisation
+greps, `ruff` and `pytest`, `promtool`, and re-rendering ConfigMaps. Manual
+steps are skipped exactly when they matter, late and in a hurry, and the
+README already claimed the exporter image was built in CI before any CI
+existed. `.github/workflows/ci.yml` now runs all of them on every push and
+pull request.
+
+The tools run from pinned container images (`prom/prometheus`,
+`prom/alertmanager`, `kubeconform`, `trivy`) rather than marketplace
+actions, for two reasons. The same command works on this Mac with Docker, so
+a CI failure can be reproduced locally without guessing what an action does
+internally. And a third-party action runs with the workflow's token, so
+every one added is code to trust; the only actions used are GitHub's own
+`checkout` and `setup-python`. The workflow token is read-only.
+
+Two checks are deliberately narrower than they could be:
+
+- `promtool check config` runs with `--syntax-only`. The full check resolves
+  the Kubernetes service-account token path, which exists only inside the
+  cluster.
+- Trivy fails only on high or critical vulnerabilities that have a fix
+  available. An unfixable CVE in the base image would block every build
+  with nothing to do about it, which trains people to ignore the job.
+
+The ConfigMap check re-renders every manifest and fails if `git diff` shows a
+change. That turns "never edit a rendered ConfigMap directly" from a rule in
+the README into something a pull request cannot get past.

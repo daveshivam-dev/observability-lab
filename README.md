@@ -1,5 +1,7 @@
 # Local observability lab
 
+[![ci](https://github.com/daveshivam-dev/observability-lab/actions/workflows/ci.yml/badge.svg)](https://github.com/daveshivam-dev/observability-lab/actions/workflows/ci.yml)
+
 A two node Kubernetes cluster running Prometheus, Alertmanager and Grafana,
 monitoring a real home network across macOS, Windows and isolated IoT devices.
 Every resource here was written directly from the API reference. No Helm
@@ -98,10 +100,12 @@ config/
   local/                        real addresses, gitignored
 manifests/                      flat and numbered, applies alphabetically
 scripts/render-all.sh           regenerates every ConfigMap from config/
+scripts/check-sanitisation.py   fails on public IPs or real MAC addresses
+.github/workflows/ci.yml        lint, test, build, scan and validate on every push
 dashboards/                     five Grafana dashboards as JSON
 exporters/homelab-exporter/     custom Python exporter, tests, Dockerfile
 docs/
-  decisions.md                  18 decisions with reasoning and dates
+  decisions.md                  19 decisions with reasoning and dates
   sanitisation.md               what must never be committed
   runbooks/                     one per alert family
   images/
@@ -240,8 +244,23 @@ This is enforced rather than trusted. A pre-push grep caught five real MAC
 addresses staged for commit in test fixtures and documentation examples,
 copied from live output while writing the files. They were replaced with the
 range RFC 7042 reserves for documentation. The person writing the rules is as
-likely to breach them as anyone else, which is why the check becomes a
-blocking CI job.
+likely to breach them as anyone else, which is why the check is now a
+blocking CI job: `scripts/check-sanitisation.py`, see below.
+
+## Continuous integration
+
+Every push and pull request runs four jobs in GitHub Actions
+([ci.yml](.github/workflows/ci.yml)):
+
+| Job | What it checks |
+|---|---|
+| sanitisation | No public IPs or real MAC addresses in any tracked file |
+| exporter | `ruff check` and `pytest` for the custom exporter |
+| image | Builds the exporter image, then Trivy fails the build on fixable high or critical vulnerabilities |
+| config | `promtool` on the Prometheus config and alert rules, `amtool` on Alertmanager, generated ConfigMaps match their sources, `kubeconform` on every manifest |
+
+The tools run from pinned container images rather than marketplace actions,
+so each step can be run locally with the same command. Reasoning in D-019.
 
 ## Known limitations
 

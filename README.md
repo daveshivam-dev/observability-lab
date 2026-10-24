@@ -9,7 +9,7 @@ charts, no kube-prometheus-stack, so the moving parts stay visible.
 
 Runs on Apple Silicon. Every image is verified for a `linux/arm64` variant
 before use, and the reasoning behind each design choice is recorded in
-[docs/decisions.md](docs/decisions.md).
+[docs/decisions.md](docs/decisions.md). The system is drawn in [docs/architecture.md](docs/architecture.md).
 
 ## What it does
 

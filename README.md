@@ -227,6 +227,11 @@ Fourteen tests, none touching the network, run with `pytest`.
 | ![alert detail](docs/images/alerts-pending-and-firing.png) | A firing alert with annotations rendered, including the resolved runbook link |
 | ![alertmanager](docs/images/alertmanager-discovery.png) | Prometheus has discovered Alertmanager |
 | ![flapping](docs/images/probe-failures-24h.png) | `changes(probe_success[24h])`, one device at 210 transitions |
+| ![mac](docs/images/dashboard-mac-host.png) | macOS host detail: CPU per core, memory breakdown with compression, swap |
+| ![health](docs/images/dashboard-monitoring-health.png) | Monitoring health: scrape duration, rule evaluation, Alertmanager delivery |
+| ![exporter](docs/images/dashboard-homelab-exporter.png) | Custom exporter: ARP presence per device and directory sizes |
+| ![targets](docs/images/targets-all-up.png) | Every scrape pool healthy, including the three blackbox modules |
+| ![dashboards](docs/images/dashboards-list.png) | Five dashboards, all versioned as JSON in the repo |
 
 ## Sanitisation
 

@@ -405,3 +405,51 @@ promising the fix still sitting next to `admin/admin`. Fixed now:
   `prometheus.yml` uses them: the service discovery roles are `endpoints`,
   `node` and `pod`. A read-only role is not the same as a minimal one.
 
+
+`endpointslices` and `nodes/metrics` were removed alongside `configmaps` and
+`ingresses`. The endpoints role reads the old Endpoints API, which the live
+targets confirm by carrying `__meta_kubernetes_endpoint_*` labels;
+`role: endpointslice` is a separate role nothing in `prometheus.yml` uses.
+Node and cAdvisor metrics are scraped through the API server proxy, which
+needs `nodes/proxy` rather than `nodes/metrics`. Both were removed, the
+manifest reapplied and Prometheus restarted, and all 15 targets stayed up, so
+neither was load-bearing. Prometheus does log that v1 Endpoints is deprecated
+in 1.33+, so moving to `role: endpointslice` later means adding that
+permission back.
+
+## D-021: CI deploys the stack, not just the manifests
+
+`kubeconform` proves a manifest matches its schema and `promtool` proves a
+config parses. Neither proves the stack starts. This repo already shipped the
+counterexample: `manifests/33-alertmanager-configmap.yaml` was never
+committed, every schema check passed, and a fresh clone would have left
+Alertmanager waiting on a ConfigMap that did not exist. A missing Secret, a
+wrong image tag and a bad volume mount all fail the same way, as valid YAML
+and a broken cluster.
+
+The `deploy` job creates a kind cluster inside the runner, applies the
+namespace, runs `scripts/bootstrap-secrets.sh`, applies every manifest and
+waits for each Deployment to report Available. Running the bootstrap script
+there, rather than inlining a `kubectl create secret` command, also tests that
+the run order documented in the README is correct.
+
+It then asserts four things that only a running stack can show: every
+Deployment reaches Available, Prometheus serves `/-/ready`, more than zero
+rule groups are loaded (which proves the mounted ConfigMap arrived), and both
+`up{job="prometheus"}` is 1 and Alertmanager was discovered.
+
+It deliberately does not assert a target count. The Mac, the Windows host and
+the IoT devices do not exist on a GitHub runner, so those targets are
+legitimately down there, and asserting 15 would fail every run for a reason
+unrelated to the change under test.
+
+kind is installed from a pinned release binary rather than a marketplace
+action, for the reason already given in D-019.
+
+The first run failed, and the failure is worth recording. The PromQL
+assertion went into the URL unencoded, so the braces and quotes reached
+Prometheus raw. It answered with an error object containing no `data` key,
+and the parser tripped on that rather than on anything real. The fix was
+`curl -G --data-urlencode`. The same trap is written down in the Session 2
+notes from the first time it happened, which is a fair argument that a check
+written down and never re-read is not a check.

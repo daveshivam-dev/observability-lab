@@ -405,7 +405,6 @@ promising the fix still sitting next to `admin/admin`. Fixed now:
   `prometheus.yml` uses them: the service discovery roles are `endpoints`,
   `node` and `pod`. A read-only role is not the same as a minimal one.
 
-
 `endpointslices` and `nodes/metrics` were removed alongside `configmaps` and
 `ingresses`. The endpoints role reads the old Endpoints API, which the live
 targets confirm by carrying `__meta_kubernetes_endpoint_*` labels;
@@ -421,9 +420,11 @@ permission back.
 
 `kubeconform` proves a manifest matches its schema and `promtool` proves a
 config parses. Neither proves the stack starts. This repo already shipped the
-counterexample: `manifests/33-alertmanager-configmap.yaml` was never
-committed, every schema check passed, and a fresh clone would have left
-Alertmanager waiting on a ConfigMap that did not exist. A missing Secret, a
+counterexample: `manifests/33-alertmanager-configmap.yaml` was added in
+`cae2c34`, then deleted by `d38d8ae`, a commit whose only intent was to
+change the README. Every schema check still passed. For a day, a fresh clone
+would have left Alertmanager waiting on a ConfigMap that did not exist, and
+nothing in the pipeline could have told anyone. A missing Secret, a
 wrong image tag and a bad volume mount all fail the same way, as valid YAML
 and a broken cluster.
 
@@ -450,6 +451,7 @@ The first run failed, and the failure is worth recording. The PromQL
 assertion went into the URL unencoded, so the braces and quotes reached
 Prometheus raw. It answered with an error object containing no `data` key,
 and the parser tripped on that rather than on anything real. The fix was
-`curl -G --data-urlencode`. The same trap is written down in the Session 2
-notes from the first time it happened, which is a fair argument that a check
-written down and never re-read is not a check.
+`curl -G --data-urlencode`. The same trap had already been hit once earlier in
+this project and written down at the time, in notes kept outside the repo,
+which is a fair argument that a check written down and never re-read is not
+a check.

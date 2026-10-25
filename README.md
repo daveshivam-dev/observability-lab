@@ -106,7 +106,7 @@ scripts/check-sanitisation.py   fails on public IPs or real MAC addresses
 dashboards/                     five Grafana dashboards as JSON
 exporters/homelab-exporter/     custom Python exporter, tests, Dockerfile
 docs/
-  decisions.md                  20 decisions with reasoning and dates
+  decisions.md                  21 decisions with reasoning and dates
   sanitisation.md               what must never be committed
   runbooks/                     one per alert family
   images/
@@ -259,7 +259,7 @@ blocking CI job: `scripts/check-sanitisation.py`, see below.
 
 ## Continuous integration
 
-Every push and pull request runs four jobs in GitHub Actions
+Every push and pull request runs five jobs in GitHub Actions
 ([ci.yml](.github/workflows/ci.yml)):
 
 | Job | What it checks |
@@ -268,9 +268,11 @@ Every push and pull request runs four jobs in GitHub Actions
 | exporter | `ruff check` and `pytest` for the custom exporter |
 | image | Builds the exporter image, then Trivy fails the build on fixable high or critical vulnerabilities |
 | config | `promtool` on the Prometheus config and alert rules, `amtool` on Alertmanager, generated ConfigMaps match their sources, `kubeconform` on every manifest |
+| deploy | Creates a throwaway kind cluster, applies every manifest, waits for each Deployment to become Available, then checks that Prometheus loaded its rules, scrapes itself and discovered Alertmanager |
 
 The tools run from pinned container images rather than marketplace actions,
-so each step can be run locally with the same command. Reasoning in D-019.
+so each step can be run locally with the same command. Reasoning in D-019
+and D-021.
 
 ## Known limitations
 

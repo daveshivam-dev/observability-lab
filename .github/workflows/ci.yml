@@ -79,8 +79,6 @@ jobs:
             || { echo "Manifests are stale: run scripts/render-all.sh and commit."; exit 1; }
       - name: Kubernetes manifests
         run: docker run --rm -v "$PWD/manifests:/m:ro" "$KUBECONFORM_IMAGE" -strict -summary /m
-# Append to .github/workflows/ci.yml, at the same indent as the other jobs.
-# Change `needs:` if your manifest-validation job is not called `config`.
 
   deploy:
     runs-on: ubuntu-latest
@@ -113,10 +111,9 @@ jobs:
       - name: Every Deployment becomes Available
         run: kubectl -n observability wait --for=condition=Available deploy --all --timeout=240s
 
-      # kind-config maps NodePort 30090 to 9090 on the host, so no port-forward is needed.
       - name: Prometheus is ready and has loaded its rules
         run: |
-          for i in $(seq 1 30); do
+          for _ in $(seq 1 30); do
             curl -sf http://localhost:9090/-/ready >/dev/null && break
             sleep 2
           done
@@ -129,8 +126,6 @@ jobs:
 
       - name: Prometheus can reach the in-cluster targets
         run: |
-          # Host and LAN exporters do not exist on a runner, so only the in-cluster
-          # jobs are asserted. A pod that cannot scrape itself is a real failure.
           up=$(curl -sG http://localhost:9090/api/v1/query --data-urlencode 'query=up{job="prometheus"}' \
             | python3 -c 'import json,sys; d=json.load(sys.stdin)["data"]["result"]; print(d[0]["value"][1] if d else "0")')
           echo "up{job=prometheus} = $up"

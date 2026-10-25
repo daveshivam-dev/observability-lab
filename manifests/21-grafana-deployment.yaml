@@ -29,11 +29,18 @@ spec:
           image: grafana/grafana:12.4.4
           imagePullPolicy: IfNotPresent
           env:
+            # Created at bootstrap by scripts/bootstrap-secrets.sh, never
+            # committed (D-020).
             - name: GF_SECURITY_ADMIN_USER
-              value: admin
-            # Local lab only. Move to a Secret before this repo goes public.
+              valueFrom:
+                secretKeyRef:
+                  name: grafana-admin
+                  key: admin-user
             - name: GF_SECURITY_ADMIN_PASSWORD
-              value: admin
+              valueFrom:
+                secretKeyRef:
+                  name: grafana-admin
+                  key: admin-password
             - name: GF_USERS_ALLOW_SIGN_UP
               value: "false"
             - name: GF_ANALYTICS_REPORTING_ENABLED

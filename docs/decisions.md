@@ -385,3 +385,23 @@ Two checks are deliberately narrower than they could be:
 The ConfigMap check re-renders every manifest and fails if `git diff` shows a
 change. That turns "never edit a rendered ConfigMap directly" from a rule in
 the README into something a pull request cannot get past.
+
+## D-020: Hardening pass before sharing the repo
+
+D-005 accepted a plain-text Grafana password only until the repo was
+published. The repo went public before that happened, with the comment
+promising the fix still sitting next to `admin/admin`. Fixed now:
+
+- **Grafana credentials** come from a `grafana-admin` Secret created by
+  `scripts/bootstrap-secrets.sh` with a random password. The Deployment reads
+  it through `secretKeyRef`. Nothing credentialed is committed, and the
+  script leaves an existing Secret alone so re-running it is safe.
+- **A duplicate ConfigMap was removed.** `30-alertmanager-configmap.yaml` and
+  `33-alertmanager-configmap.yaml` both defined `alertmanager-config`. Only
+  33 is rendered by `render-all.sh` and covered by the CI drift check, so 30
+  was an unchecked copy that would have silently lost to 33 the first time
+  someone edited it.
+- **The Prometheus ClusterRole lost `configmaps` and `ingresses`.** Nothing in
+  `prometheus.yml` uses them: the service discovery roles are `endpoints`,
+  `node` and `pod`. A read-only role is not the same as a minimal one.
+

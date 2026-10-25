@@ -28,19 +28,12 @@ rules:
     resources:
       - nodes/proxy
     verbs: ["get"]
-  - apiGroups: [""]
-    resources:
-      - configmaps
-    verbs: ["get"]
   - apiGroups: ["discovery.k8s.io"]
     resources:
       - endpointslices
     verbs: ["get", "list", "watch"]
-  - apiGroups: ["networking.k8s.io"]
-    resources:
-      - ingresses
-    verbs: ["get", "list", "watch"]
-  # Read-only, no write verbs anywhere: this is the point interviewers push on.
+  # Read-only, no write verbs anywhere. Only what the endpoints, node and pod
+  # service discovery roles in prometheus.yml actually use (D-020).
   - nonResourceURLs: ["/metrics", "/metrics/cadvisor"]
     verbs: ["get"]
 ---

@@ -121,7 +121,7 @@ cannot do for YAML embedded in a ConfigMap's `data` block.
 
 ```
 ./scripts/render-all.sh
-kubectl apply -f manifests/
+kubectl apply --server-side -f manifests/
 kubectl -n observability rollout restart deploy/prometheus
 ```
 
@@ -136,7 +136,7 @@ costs a debugging round.
 kind create cluster --config cluster/kind-config.yaml
 kubectl apply -f manifests/00-namespace.yaml
 ./scripts/bootstrap-secrets.sh
-kubectl apply -f manifests/
+kubectl apply --server-side -f manifests/
 kubectl -n observability get pods -w
 ```
 

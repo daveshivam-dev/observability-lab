@@ -106,7 +106,7 @@ jobs:
           ./scripts/bootstrap-secrets.sh
 
       - name: Apply every manifest
-        run: kubectl apply -f manifests/
+        run: kubectl apply --server-side -f manifests/
 
       - name: Every Deployment becomes Available
         run: kubectl -n observability wait --for=condition=Available deploy --all --timeout=240s

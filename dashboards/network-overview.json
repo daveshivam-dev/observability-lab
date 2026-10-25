@@ -1,28 +1,4 @@
 {
-  "__inputs": [
-    {
-      "name": "DS_PROMETHEUS",
-      "label": "Prometheus",
-      "description": "",
-      "type": "datasource",
-      "pluginId": "prometheus",
-      "pluginName": "Prometheus"
-    }
-  ],
-  "__requires": [
-    {
-      "type": "grafana",
-      "id": "grafana",
-      "name": "Grafana",
-      "version": "11.0.0"
-    },
-    {
-      "type": "datasource",
-      "id": "prometheus",
-      "name": "Prometheus",
-      "version": "1.0.0"
-    }
-  ],
   "annotations": {
     "list": [
       {
@@ -62,7 +38,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "prometheus"
       },
       "description": "Six targets are configured: the router, two hosts, one IoT device and two external controls.",
       "fieldConfig": {
@@ -120,7 +96,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "prometheus"
           },
           "editorMode": "code",
           "expr": "count(probe_success == 1)",
@@ -135,7 +111,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "prometheus"
       },
       "description": "vector(0) makes this read 0 rather than No data when everything is healthy.",
       "fieldConfig": {
@@ -193,7 +169,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "prometheus"
           },
           "editorMode": "code",
           "expr": "count(probe_success == 0) or vector(0)",
@@ -208,7 +184,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "prometheus"
       },
       "description": "Proportion rather than count, so it survives adding targets.",
       "fieldConfig": {
@@ -266,7 +242,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "prometheus"
           },
           "editorMode": "code",
           "expr": "100 * count(probe_success == 1) / count(probe_success)",
@@ -281,7 +257,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "prometheus"
       },
       "description": "The single most useful panel here. If this is up while a device is down, the problem is the device. If everything is down together, the problem is your network or the exporter.",
       "fieldConfig": {
@@ -351,7 +327,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "prometheus"
           },
           "editorMode": "code",
           "expr": "probe_success{instance=\"1.1.1.1\"}",
@@ -366,7 +342,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "prometheus"
       },
       "description": "The flap leader. A device that transitions constantly is a dashboard candidate, not a paging candidate.",
       "fieldConfig": {
@@ -424,7 +400,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "prometheus"
           },
           "editorMode": "code",
           "expr": "topk(1, changes(probe_success[24h]))",
@@ -439,7 +415,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "prometheus"
       },
       "description": "Slowest probe of the moment.",
       "fieldConfig": {
@@ -490,7 +466,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "prometheus"
           },
           "editorMode": "code",
           "expr": "topk(1, probe_duration_seconds)",
@@ -505,7 +481,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "prometheus"
       },
       "description": "One bar per target. Red is down. Grouped by job in the legend labels.",
       "fieldConfig": {
@@ -563,7 +539,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "prometheus"
           },
           "editorMode": "code",
           "expr": "probe_success",
@@ -578,7 +554,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "prometheus"
       },
       "description": "Seconds since each target last answered. More actionable during an incident than a binary up or down.",
       "fieldConfig": {
@@ -638,7 +614,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "prometheus"
           },
           "editorMode": "code",
           "expr": "time() - timestamp(probe_success == 1)",
@@ -666,7 +642,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "prometheus"
       },
       "description": "Flat at 1 is healthy. Use a narrow time range to tell a 30 second flap apart from a real outage; at a wide range they look identical, which is why alert rules need a for clause.",
       "fieldConfig": {
@@ -751,7 +727,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "prometheus"
           },
           "editorMode": "code",
           "expr": "probe_success",
@@ -766,7 +742,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "prometheus"
       },
       "description": "Retention is 6h, so this currently averages over whatever history exists rather than a true 24 hours.",
       "fieldConfig": {
@@ -828,7 +804,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "prometheus"
           },
           "editorMode": "code",
           "expr": "avg_over_time(probe_success[24h]) * 100",
@@ -843,7 +819,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "prometheus"
       },
       "description": "The flap counter. Counts transitions in both directions, so one outage with a recovery scores 2.",
       "fieldConfig": {
@@ -903,7 +879,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "prometheus"
           },
           "editorMode": "code",
           "expr": "changes(probe_success[24h])",
@@ -918,7 +894,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "prometheus"
       },
       "description": "Total probe time across every phase. Wi-Fi power saving on battery devices shows as periodic spikes.",
       "fieldConfig": {
@@ -1009,7 +985,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "prometheus"
           },
           "editorMode": "code",
           "expr": "probe_duration_seconds",
@@ -1037,7 +1013,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "prometheus"
       },
       "description": "Broken down by phase: resolve, setup and rtt. The rtt phase is the actual network latency.",
       "fieldConfig": {
@@ -1120,7 +1096,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "prometheus"
           },
           "editorMode": "code",
           "expr": "probe_icmp_duration_seconds",
@@ -1135,7 +1111,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "prometheus"
       },
       "description": "TTL on the reply, so it shows how many hops away each target is. The router is one hop; 1.1.1.1 is many. A sudden change means the route changed, which almost nobody dashboards.",
       "fieldConfig": {
@@ -1218,7 +1194,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "prometheus"
           },
           "editorMode": "code",
           "expr": "probe_icmp_reply_hop_limit",
@@ -1233,7 +1209,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "prometheus"
       },
       "description": "4 or 6. Worth watching because a probe silently falling back to IPv6 produces confusing results, which is why ip_protocol_fallback is disabled in the blackbox config.",
       "fieldConfig": {
@@ -1285,7 +1261,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "prometheus"
           },
           "editorMode": "code",
           "expr": "probe_ip_protocol",
@@ -1313,7 +1289,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "prometheus"
       },
       "description": "Green from 200, amber for redirects, red for 4xx and 5xx. A 200 from the wrong page still counts as success, which is what probe_failed_due_to_regex exists to catch.",
       "fieldConfig": {
@@ -1377,7 +1353,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "prometheus"
           },
           "editorMode": "code",
           "expr": "probe_http_status_code",
@@ -1392,7 +1368,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "prometheus"
       },
       "description": "Phases: resolve, connect, tls, processing, transfer. This is the curl timing breakdown as a panel, and it tells you which layer to fix.",
       "fieldConfig": {
@@ -1475,7 +1451,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "prometheus"
           },
           "editorMode": "code",
           "expr": "probe_http_duration_seconds",
@@ -1490,7 +1466,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "prometheus"
       },
       "description": "A sudden change in body size often means the page changed to an error or a login redirect while still returning 200.",
       "fieldConfig": {
@@ -1573,7 +1549,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "prometheus"
           },
           "editorMode": "code",
           "expr": "probe_http_content_length",
@@ -1584,7 +1560,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "prometheus"
           },
           "editorMode": "code",
           "expr": "probe_http_uncompressed_body_length",
@@ -1599,7 +1575,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "prometheus"
       },
       "description": "Catches a site quietly starting to redirect, which adds latency and can break API clients.",
       "fieldConfig": {
@@ -1659,7 +1635,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "prometheus"
           },
           "editorMode": "code",
           "expr": "probe_http_redirects",
@@ -1674,7 +1650,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "prometheus"
       },
       "description": "1.1 or 2.0. A downgrade usually means a proxy or load balancer changed.",
       "fieldConfig": {
@@ -1726,7 +1702,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "prometheus"
           },
           "editorMode": "code",
           "expr": "probe_http_version",
@@ -1741,7 +1717,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "prometheus"
       },
       "description": "1 means the page returned successfully but did not contain the expected content. No regex is configured yet, so this reads 0 for every target.",
       "fieldConfig": {
@@ -1813,7 +1789,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "prometheus"
           },
           "editorMode": "code",
           "expr": "probe_failed_due_to_regex",
@@ -1841,7 +1817,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "prometheus"
       },
       "description": "HTTPS targets only. Certificate expiry is a classic outage cause precisely because nothing warns you until it happens.",
       "fieldConfig": {
@@ -1900,7 +1876,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "prometheus"
           },
           "editorMode": "code",
           "expr": "(probe_ssl_earliest_cert_expiry - time()) / 86400",
@@ -1915,7 +1891,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "prometheus"
       },
       "description": "A sawtooth means automated renewal is working. A straight line to zero means it is not.",
       "fieldConfig": {
@@ -2006,7 +1982,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "prometheus"
           },
           "editorMode": "code",
           "expr": "(probe_ssl_earliest_cert_expiry - time()) / 86400",
@@ -2021,7 +1997,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "prometheus"
       },
       "description": "Whether the final request used TLS. A target silently dropping to plain HTTP after a redirect shows here.",
       "fieldConfig": {
@@ -2089,7 +2065,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "prometheus"
           },
           "editorMode": "code",
           "expr": "probe_http_ssl",
@@ -2104,7 +2080,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "prometheus"
       },
       "description": "The version label carries the result. A downgrade is a compliance signal worth noticing.",
       "fieldConfig": {
@@ -2159,7 +2135,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "prometheus"
           },
           "editorMode": "code",
           "expr": "probe_tls_version_info",
@@ -2193,7 +2169,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "prometheus"
       },
       "description": "Issuer and subject of the served chain. A changed issuer means the certificate was reissued, possibly by something you did not expect.",
       "fieldConfig": {
@@ -2248,7 +2224,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "prometheus"
           },
           "editorMode": "code",
           "expr": "probe_ssl_last_chain_info",
@@ -2295,7 +2271,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "prometheus"
       },
       "description": "Only targets given as hostnames produce this. Raw IP targets have nothing to resolve, so four of the six are absent by design.",
       "fieldConfig": {
@@ -2386,7 +2362,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "prometheus"
           },
           "editorMode": "code",
           "expr": "probe_dns_lookup_time_seconds",
@@ -2401,7 +2377,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "prometheus"
       },
       "description": "probe_ip_addr_hash is a hash of the resolved address. A change means DNS now points somewhere else, which catches a DHCP reassignment or a CDN switch before anything breaks.",
       "fieldConfig": {
@@ -2492,7 +2468,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "prometheus"
           },
           "editorMode": "code",
           "expr": "changes(probe_ip_addr_hash[1h])",
@@ -2507,7 +2483,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "prometheus"
       },
       "description": "The hash itself is meaningless; only changes matter. Compare against the panel to the left.",
       "fieldConfig": {
@@ -2559,7 +2535,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "prometheus"
           },
           "editorMode": "code",
           "expr": "probe_ip_addr_hash",
@@ -2587,7 +2563,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "prometheus"
       },
       "description": "If the exporter stops, every probe series disappears rather than going to 0. That silent failure is why the alert rule uses absent().",
       "fieldConfig": {
@@ -2657,7 +2633,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "prometheus"
           },
           "editorMode": "code",
           "expr": "count(probe_success) > 0",
@@ -2672,7 +2648,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "prometheus"
       },
       "description": "A probe job approaching the 15s scrape interval means timeouts are being hit.",
       "fieldConfig": {
@@ -2731,7 +2707,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "prometheus"
           },
           "editorMode": "code",
           "expr": "max(scrape_duration_seconds{job=~\"blackbox.*\"})",
@@ -2746,7 +2722,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "prometheus"
       },
       "description": "Rising duration precedes probes starting to fail.",
       "fieldConfig": {
@@ -2829,7 +2805,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "prometheus"
           },
           "editorMode": "code",
           "expr": "scrape_duration_seconds{job=~\"blackbox.*\"}",
@@ -2844,7 +2820,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "prometheus"
       },
       "description": "Every target with its current state, filterable by job. The one table to read first during an incident.",
       "fieldConfig": {
@@ -2920,7 +2896,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "prometheus"
           },
           "editorMode": "code",
           "expr": "probe_success",

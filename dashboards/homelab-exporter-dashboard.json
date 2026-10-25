@@ -1,28 +1,4 @@
 {
-  "__inputs": [
-    {
-      "name": "DS_PROMETHEUS",
-      "label": "Prometheus",
-      "description": "",
-      "type": "datasource",
-      "pluginId": "prometheus",
-      "pluginName": "Prometheus"
-    }
-  ],
-  "__requires": [
-    {
-      "type": "grafana",
-      "id": "grafana",
-      "name": "Grafana",
-      "version": "11.0.0"
-    },
-    {
-      "type": "datasource",
-      "id": "prometheus",
-      "name": "Prometheus",
-      "version": "1.0.0"
-    }
-  ],
   "annotations": {
     "list": [
       {
@@ -62,7 +38,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "prometheus"
       },
       "description": "Tracked devices currently in the ARP table.",
       "fieldConfig": {
@@ -120,7 +96,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "prometheus"
           },
           "editorMode": "code",
           "expr": "sum(homelab_device_present)",
@@ -135,7 +111,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "prometheus"
       },
       "description": "These cannot be probed by blackbox: client isolation drops ICMP. ARP presence is the only signal available for them.",
       "fieldConfig": {
@@ -193,7 +169,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "prometheus"
           },
           "editorMode": "code",
           "expr": "sum(homelab_device_present{type=\"iot\"})",
@@ -208,7 +184,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "prometheus"
       },
       "description": "Present in ARP but absent from the device map. A rise means something new joined the network. Counted, never labelled, so cardinality stays bounded.",
       "fieldConfig": {
@@ -266,7 +242,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "prometheus"
           },
           "editorMode": "code",
           "expr": "homelab_arp_unmapped_devices",
@@ -281,7 +257,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "prometheus"
       },
       "description": "Unicast only. Multicast ranges are excluded.",
       "fieldConfig": {
@@ -331,7 +307,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "prometheus"
           },
           "editorMode": "code",
           "expr": "sum(homelab_arp_devices_total)",
@@ -346,7 +322,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "prometheus"
       },
       "description": "A frozen collector serves stale values that look like a stable network.",
       "fieldConfig": {
@@ -404,7 +380,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "prometheus"
           },
           "editorMode": "code",
           "expr": "time() - homelab_collector_last_run_timestamp_seconds",
@@ -419,7 +395,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "prometheus"
       },
       "description": "The exporter degrades rather than crashing, so this counter is the only sign a collector stopped working.",
       "fieldConfig": {
@@ -477,7 +453,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "prometheus"
           },
           "editorMode": "code",
           "expr": "sum(increase(homelab_collector_errors_total[1h]))",
@@ -492,7 +468,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "prometheus"
       },
       "description": "Red is absent. Devices labelled iot cannot be reached by any other check in this stack.",
       "fieldConfig": {
@@ -550,7 +526,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "prometheus"
           },
           "editorMode": "code",
           "expr": "homelab_device_present",
@@ -565,7 +541,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "prometheus"
       },
       "description": "Embedded devices drop off the ARP table briefly when idle, which is why the alert uses a 30 minute for clause.",
       "fieldConfig": {
@@ -650,7 +626,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "prometheus"
           },
           "editorMode": "code",
           "expr": "homelab_device_present",
@@ -665,7 +641,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "prometheus"
       },
       "description": "More actionable during an incident than a binary present or absent.",
       "fieldConfig": {
@@ -725,7 +701,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "prometheus"
           },
           "editorMode": "code",
           "expr": "time() - homelab_device_last_seen_timestamp_seconds",
@@ -740,7 +716,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "prometheus"
       },
       "description": "Unicast addresses only.",
       "fieldConfig": {
@@ -792,7 +768,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "prometheus"
           },
           "editorMode": "code",
           "expr": "homelab_arp_devices_total",
@@ -820,7 +796,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "prometheus"
       },
       "description": "node_exporter reports filesystem usage but not which directory consumes it. In October 2026 one application cache reached 127 GB with no metric moving until the volume alert fired at 85 percent.",
       "fieldConfig": {
@@ -880,7 +856,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "prometheus"
           },
           "editorMode": "code",
           "expr": "homelab_directory_size_bytes",
@@ -895,7 +871,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "prometheus"
       },
       "description": "The shape matters more than the value. A staircase that never comes down is the pattern that fills a disk.",
       "fieldConfig": {
@@ -978,7 +954,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "prometheus"
           },
           "editorMode": "code",
           "expr": "homelab_directory_size_bytes",
@@ -993,7 +969,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "prometheus"
       },
       "description": "Absent is distinct from empty. A directory on the external SSD reports absent while the drive is unmounted, which must not look like a successful cleanup.",
       "fieldConfig": {
@@ -1065,7 +1041,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "prometheus"
           },
           "editorMode": "code",
           "expr": "homelab_directory_present",
@@ -1080,7 +1056,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "prometheus"
       },
       "description": "Catches a runaway directory before it becomes a disk alert.",
       "fieldConfig": {
@@ -1138,7 +1114,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "prometheus"
           },
           "editorMode": "code",
           "expr": "predict_linear(homelab_directory_size_bytes[6h], 7*86400)",
@@ -1166,7 +1142,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "prometheus"
       },
       "description": "du over a large tree takes tens of seconds against about one for ARP. They run on separate threads and schedules for exactly this reason.",
       "fieldConfig": {
@@ -1249,7 +1225,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "prometheus"
           },
           "editorMode": "code",
           "expr": "homelab_collector_duration_seconds",
@@ -1264,7 +1240,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "prometheus"
       },
       "description": "Note that an empty ARP table raises rather than reporting an empty network, so a permissions failure shows here instead of as every device absent.",
       "fieldConfig": {
@@ -1351,7 +1327,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "prometheus"
           },
           "editorMode": "code",
           "expr": "increase(homelab_collector_errors_total[1h])",
@@ -1366,7 +1342,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "uid": "prometheus"
       },
       "description": "Version and platform.",
       "fieldConfig": {
@@ -1421,7 +1397,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "prometheus"
           },
           "editorMode": "code",
           "expr": "homelab_exporter_build_info",

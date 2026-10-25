@@ -131,7 +131,7 @@ jobs:
         run: |
           # Host and LAN exporters do not exist on a runner, so only the in-cluster
           # jobs are asserted. A pod that cannot scrape itself is a real failure.
-          up=$(curl -s 'http://localhost:9090/api/v1/query?query=up{job="prometheus"}' \
+          up=$(curl -sG http://localhost:9090/api/v1/query --data-urlencode 'query=up{job="prometheus"}' \
             | python3 -c 'import json,sys; d=json.load(sys.stdin)["data"]["result"]; print(d[0]["value"][1] if d else "0")')
           echo "up{job=prometheus} = $up"
           test "$up" = "1"
